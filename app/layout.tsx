@@ -35,6 +35,7 @@ export default function RootLayout({
   return (
     <html lang="uz">
       <head>
+        <script src="https://telegram.org/js/telegram-web-app.js?58"></script>
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
