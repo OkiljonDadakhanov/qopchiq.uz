@@ -28,7 +28,7 @@ export default function ChallengesPage() {
 
   const texts = {
     uz: {
-      title: "Tejash musobaqalari",
+      title: "Tejash chellenjlari",
     },
     ru: {
       title: "Вызовы экономии",

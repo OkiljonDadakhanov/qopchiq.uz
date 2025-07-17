@@ -1,45 +1,51 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Award, Target } from "lucide-react"
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Award, Target } from "lucide-react";
 
 interface Expense {
-  id: string
-  amount: number
-  category: string
-  emoji: string
-  description: string
-  date: string
-  mood?: string
+  id: string;
+  amount: number;
+  category: string;
+  emoji: string;
+  description: string;
+  date: string;
+  mood?: string;
 }
 
 interface Challenge {
-  id: string
-  title: string
-  description: string
-  category: string
-  targetReduction: number
-  badge: string
-  isCompleted: boolean
-  progress: number
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  frequency: "daily" | "weekly" | "monthly";
+  targetReduction: number;
+  badge: string;
+  isCompleted: boolean;
+  progress: number;
 }
 
 interface SavingsChallengeProps {
-  expenses: Expense[]
-  language: "uz" | "ru" | "en"
-  onBadgeEarned: (badge: string) => void
+  expenses: Expense[];
+  language: "uz" | "ru" | "en";
+  onBadgeEarned: (badge: string) => void;
 }
 
-export function SavingsChallenge({ expenses, language, onBadgeEarned }: SavingsChallengeProps) {
+export function SavingsChallenge({
+  expenses,
+  language,
+  onBadgeEarned,
+}: SavingsChallengeProps) {
   const [challenges, setChallenges] = useState<Challenge[]>([
     {
       id: "1",
       title: "Fast Food Challenge",
       description: "Spend 10% less on 🍔 Fast food this week",
       category: "food",
+      frequency: "weekly",
       targetReduction: 10,
       badge: "🎖️ Healthy Eater",
       isCompleted: false,
@@ -47,95 +53,121 @@ export function SavingsChallenge({ expenses, language, onBadgeEarned }: SavingsC
     },
     {
       id: "2",
-      title: "Transport Saver",
-      description: "Reduce 🚗 transport costs by 15%",
+      title: "Transport Daily Saver",
+      description: "Reduce 🚗 transport cost today by 15%",
       category: "transport",
+      frequency: "daily",
       targetReduction: 15,
-      badge: "🚶‍♂️ Walker",
+      badge: "🛴 Minimal Mover",
       isCompleted: false,
       progress: 0,
     },
     {
       id: "3",
-      title: "Entertainment Budget",
-      description: "Cut 🎮 entertainment spending by 20%",
+      title: "Entertainment Monthly Cut",
+      description: "Cut 🎮 entertainment by 20% this month",
       category: "entertainment",
+      frequency: "monthly",
       targetReduction: 20,
-      badge: "📚 Productive",
+      badge: "🎓 Smart Fun",
       isCompleted: false,
       progress: 0,
     },
-  ])
+  ]);
 
   const texts = {
     uz: {
-      title: "Tejash musobaqasi",
-      thisWeek: "Bu hafta",
-      lastWeek: "O'tgan hafta",
-      saved: "tejaldi",
+      title: "Tejash challenji",
       completed: "Bajarildi",
       inProgress: "Jarayonda",
-      earnBadge: "Nishon olish",
     },
     ru: {
       title: "Вызов экономии",
-      thisWeek: "На этой неделе",
-      lastWeek: "На прошлой неделе",
-      saved: "сэкономлено",
       completed: "Завершено",
       inProgress: "В процессе",
-      earnBadge: "Получить значок",
     },
     en: {
       title: "Savings Challenge",
-      thisWeek: "This week",
-      lastWeek: "Last week",
-      saved: "saved",
       completed: "Completed",
       inProgress: "In Progress",
-      earnBadge: "Earn Badge",
     },
-  }
+  };
 
-  const t = texts[language]
+  const t = texts[language];
 
   useEffect(() => {
-    // Calculate progress for each challenge
-    const now = new Date()
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+    const now = new Date();
 
-    const thisWeekExpenses = expenses.filter((e) => new Date(e.date) >= weekAgo)
-    const lastWeekExpenses = expenses.filter((e) => new Date(e.date) >= twoWeeksAgo && new Date(e.date) < weekAgo)
+    // Helper function: filter by date range
+    const filterExpenses = (from: Date, to: Date, category: string) => {
+      return expenses
+        .filter(
+          (e) =>
+            new Date(e.date) >= from &&
+            new Date(e.date) < to &&
+            e.category === category
+        )
+        .reduce((sum, e) => sum + e.amount, 0);
+    };
 
     setChallenges((prev) =>
       prev.map((challenge) => {
-        const thisWeekSpent = thisWeekExpenses
-          .filter((e) => e.category === challenge.category)
-          .reduce((sum, e) => sum + e.amount, 0)
+        const today = new Date(now.toDateString());
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
 
-        const lastWeekSpent = lastWeekExpenses
-          .filter((e) => e.category === challenge.category)
-          .reduce((sum, e) => sum + e.amount, 0)
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - 7);
+        const twoWeeksAgo = new Date(now);
+        twoWeeksAgo.setDate(now.getDate() - 14);
 
-        if (lastWeekSpent === 0) return challenge
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthStart = new Date(
+          now.getFullYear(),
+          now.getMonth() - 1,
+          1
+        );
+        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const reduction = ((lastWeekSpent - thisWeekSpent) / lastWeekSpent) * 100
-        const progress = Math.min((reduction / challenge.targetReduction) * 100, 100)
-        const isCompleted = progress >= 100
+        let current = 0;
+        let previous = 0;
+
+        if (challenge.frequency === "daily") {
+          current = filterExpenses(today, now, challenge.category);
+          previous = filterExpenses(yesterday, today, challenge.category);
+        } else if (challenge.frequency === "weekly") {
+          current = filterExpenses(weekStart, now, challenge.category);
+          previous = filterExpenses(twoWeeksAgo, weekStart, challenge.category);
+        } else if (challenge.frequency === "monthly") {
+          current = filterExpenses(monthStart, now, challenge.category);
+          previous = filterExpenses(
+            lastMonthStart,
+            lastMonthEnd,
+            challenge.category
+          );
+        }
+
+        if (previous === 0) return challenge;
+
+        const reduction = ((previous - current) / previous) * 100;
+        const progress = Math.min(
+          (reduction / challenge.targetReduction) * 100,
+          100
+        );
+        const isCompleted = progress >= 100;
 
         if (isCompleted && !challenge.isCompleted) {
-          onBadgeEarned(challenge.badge)
+          onBadgeEarned(challenge.badge);
         }
 
         return {
           ...challenge,
           progress,
           isCompleted,
-        }
-      }),
-    )
-  }, [expenses, onBadgeEarned])
+        };
+      })
+    );
+  }, [expenses, onBadgeEarned]);
 
   return (
     <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
@@ -172,5 +204,5 @@ export function SavingsChallenge({ expenses, language, onBadgeEarned }: SavingsC
         ))}
       </CardContent>
     </Card>
-  )
+  );
 }
