@@ -26,13 +26,12 @@ export async function POST(req: NextRequest) {
   if (!chatId || !text) {
     return new Response("Missing data", { status: 400 });
   }
-  
 
   switch (text) {
     case "/start":
       await sendMessage(
         chatId,
-        `Welcome to <b>Qopchiq</b> 💰!\nOpen the app here:\nhttps://your-webapp-url`
+        `Welcome to <b>Qopchiq</b> 💰!\nOpen the app here:\nhttps://qopchiq-uz.vercel.app/`
       );
       break;
 
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
     case "/stats":
       await sendMessage(
         chatId,
-        `📊 To view your stats, please open the app: https://your-webapp-url`
+        `📊 To view your stats, please open the app: https://qopchiq-uz.vercel.app/`
       );
       break;
 
