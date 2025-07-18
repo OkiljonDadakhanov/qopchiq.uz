@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
   if (!chatId || !text) {
     return new Response("Missing data", { status: 400 });
   }
+  
 
   switch (text) {
     case "/start":
