@@ -1,21 +1,23 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { MapPin } from "lucide-react"; // Import MapPin icon
 
 interface Expense {
-  id: string
-  amount: number
-  category: string
-  emoji: string
-  description: string
-  date: string
-  mood?: string
+  id: string;
+  amount: number;
+  category: string;
+  emoji: string;
+  description: string;
+  date: string;
+  mood?: string;
+  location?: string; // Added location field
 }
 
 interface ExpenseListProps {
-  expenses: Expense[]
-  language: "uz" | "ru" | "en"
+  expenses: Expense[];
+  language: "uz" | "ru" | "en";
 }
 
 export function ExpenseList({ expenses, language }: ExpenseListProps) {
@@ -35,9 +37,9 @@ export function ExpenseList({ expenses, language }: ExpenseListProps) {
       noExpenses: "No expenses today",
       sum: "UZS",
     },
-  }
+  };
 
-  const t = texts[language]
+  const t = texts[language];
 
   if (expenses.length === 0) {
     return (
@@ -47,7 +49,7 @@ export function ExpenseList({ expenses, language }: ExpenseListProps) {
           <p>{t.noExpenses}</p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -57,11 +59,16 @@ export function ExpenseList({ expenses, language }: ExpenseListProps) {
       </CardHeader>
       <CardContent className="space-y-3">
         {expenses.map((expense) => (
-          <div key={expense.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <div
+            key={expense.id}
+            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+          >
             <div className="flex items-center gap-3">
               <span className="text-2xl">{expense.emoji}</span>
               <div>
-                <div className="font-medium">{expense.description || expense.category}</div>
+                <div className="font-medium">
+                  {expense.description || expense.category}
+                </div>
                 <div className="text-sm text-gray-500 flex items-center gap-2">
                   {expense.mood && (
                     <span>
@@ -71,8 +78,16 @@ export function ExpenseList({ expenses, language }: ExpenseListProps) {
                       {expense.mood === "stressed" && "😤"}
                     </span>
                   )}
+                  {expense.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {expense.location}
+                    </span>
+                  )}
                   <span>
-                    {new Date(expense.date).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(expense.date).toLocaleTimeString("uz-UZ", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </span>
                 </div>
               </div>
@@ -84,5 +99,5 @@ export function ExpenseList({ expenses, language }: ExpenseListProps) {
         ))}
       </CardContent>
     </Card>
-  )
+  );
 }

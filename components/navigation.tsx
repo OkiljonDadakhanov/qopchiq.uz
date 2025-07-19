@@ -8,6 +8,10 @@ import {
   Bell,
   Trophy,
   BarChart3,
+  Target,
+  CalendarDays,
+  Handshake,
+  HeartPulse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +30,11 @@ export function Navigation({ language }: NavigationProps) {
       bills: "Hisob-kitob",
       challenges: "Musobaqalar",
       analytics: "Tahlil",
+      goals: "Maqsadlar",
+      debts: "Qarzlar",
+      calendar: "Kalendar",
+      health: "Sog'liq",
+      support: "Yordam",
     },
     ru: {
       home: "Главная",
@@ -34,6 +43,11 @@ export function Navigation({ language }: NavigationProps) {
       bills: "Счета",
       challenges: "Вызовы",
       analytics: "Аналитика",
+      goals: "Цели",
+      debts: "Долги",
+      calendar: "Календарь",
+      health: "Здоровье",
+      support: "Поддержка",
     },
     en: {
       home: "Home",
@@ -42,6 +56,11 @@ export function Navigation({ language }: NavigationProps) {
       bills: "Bills",
       challenges: "Challenges",
       analytics: "Analytics",
+      goals: "Goals",
+      debts: "Debts",
+      calendar: "Calendar",
+      health: "Health",
+      support: "Support",
     },
   };
 
@@ -50,64 +69,40 @@ export function Navigation({ language }: NavigationProps) {
   const navItems = [
     { href: "/", icon: Home, label: t.home },
     { href: "/expenses", icon: TrendingUp, label: t.expenses },
-    { href: "/currency-converter", icon: Calculator, label: t.currency },
     { href: "/bills", icon: Bell, label: t.bills },
-    { href: "/challenges", icon: Trophy, label: t.challenges },
+    { href: "/debts", icon: Handshake, label: t.debts },
+    { href: "/goals", icon: Target, label: t.goals },
+    { href: "/health", icon: HeartPulse, label: t.health },
     { href: "/analytics", icon: BarChart3, label: t.analytics },
   ];
 
   return (
-    <>
-      {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50 md:hidden">
-        <div className="mx-auto max-w-lg">
-          <div className="flex justify-between items-center">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
-              return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`flex flex-col items-center gap-1 h-auto py-2 px-3 rounded-md ${
-                      isActive ? "text-blue-600 bg-blue-50" : "text-gray-600"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-[10px] leading-tight">
-                      {item.label}
-                    </span>
-                  </Button>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
-
-      {/* Desktop sidebar nav */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:left-0 md:top-0 md:h-full md:w-60 bg-white border-r border-gray-200 p-4">
-        <div className="space-y-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50">
+      <div className="max-w-full overflow-x-auto">
+        <div className="flex flex-nowrap justify-between items-center gap-1 sm:gap-2 min-w-max">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.href} href={item.href} className="shrink-0">
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start gap-2 ${
-                    isActive ? "text-blue-600 bg-blue-50" : "text-gray-700"
+                  size="sm"
+                  className={`flex flex-col items-center gap-1 h-auto min-w-[60px] px-2 py-1 ${
+                    isActive ? "text-blue-600 bg-blue-50" : "text-gray-600"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
-                  <span>{item.label}</span>
+                  <span className="text-[10px] sm:text-xs leading-tight text-center">
+                    {item.label}
+                  </span>
                 </Button>
               </Link>
             );
           })}
         </div>
-      </aside>
-    </>
+      </div>
+    </nav>
   );
 }

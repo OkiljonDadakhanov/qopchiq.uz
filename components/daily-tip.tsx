@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { Card, CardContent } from "@/components/ui/card"
-import { useEffect, useState } from "react"
+import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 
 interface DailyTipProps {
-  language: "uz" | "ru" | "en"
+  language: "uz" | "ru" | "en";
 }
 
 const tips = {
@@ -35,16 +35,16 @@ const tips = {
     "😴 7-8 hours of sleep is crucial",
     "📱 Spend 1 hour without your phone",
   ],
-}
+};
 
 export function DailyTip({ language }: DailyTipProps) {
-  const [currentTip, setCurrentTip] = useState("")
+  const [currentTip, setCurrentTip] = useState("");
 
   useEffect(() => {
-    const today = new Date().getDate()
-    const tipIndex = today % tips[language].length
-    setCurrentTip(tips[language][tipIndex])
-  }, [language])
+    const today = new Date().getDate();
+    const tipIndex = today % tips[language].length;
+    setCurrentTip(tips[language][tipIndex]);
+  }, [language]);
 
   return (
     <Card className="bg-gradient-to-r from-green-100 to-blue-100 border-0 shadow-lg">
@@ -52,5 +52,5 @@ export function DailyTip({ language }: DailyTipProps) {
         <div className="text-sm font-medium text-gray-700">💡 {currentTip}</div>
       </CardContent>
     </Card>
-  )
+  );
 }

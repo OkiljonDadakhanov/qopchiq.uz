@@ -29,10 +29,27 @@ export async function POST(req: NextRequest) {
 
   switch (text) {
     case "/start":
-      await sendMessage(
-        chatId,
-        `Welcome to <b>Qopchiq</b> 💰!\nOpen the app here:\nhttps://qopchiq-uz.vercel.app/`
-      );
+      await fetch(`${TELEGRAM_API}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: `Welcome to <b>Qopchiq</b> 💰!\nOpen the app below:`,
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "📲 Open Qopchiq App",
+                  web_app: {
+                    url: "https://qopchiq-uz.vercel.app", // Web App URL
+                  },
+                },
+              ],
+            ],
+          },
+        }),
+      });
       break;
 
     case "/help":

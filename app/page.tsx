@@ -9,12 +9,12 @@ import { Plus, Droplets, Settings } from "lucide-react";
 import { AddExpenseModal } from "@/components/add-expense-modal";
 import { AddMealModal } from "@/components/add-meal-modal";
 import { ExpenseList } from "@/components/expense-list";
-import { HealthStats } from "@/components/health-stats";
 import { DailyTip } from "@/components/daily-tip";
 import { SpendingLimit } from "@/components/spending-limit";
 import { Gamification } from "@/components/gamification";
 import { Navigation } from "@/components/navigation";
 import { calculateStreak } from "@/components/streak-calculator";
+import { DailyFinanceDigest } from "@/components/daily-finance-suggest";
 
 interface Expense {
   id: string;
@@ -24,6 +24,7 @@ interface Expense {
   description: string;
   date: string;
   mood?: string;
+  location?: string;
 }
 
 interface Meal {
@@ -39,7 +40,7 @@ interface UserData {
   monthlyLimit: number;
   currentBalance: number;
   level: number;
-  points: number;
+  coins: number;
   streak: number;
   badges: string[];
 }
@@ -55,44 +56,36 @@ export default function HomePage() {
     monthlyLimit: 1000000,
     currentBalance: 500000,
     level: 1,
-    points: 0,
+    coins: 0,
     streak: 0,
     badges: [],
   });
 
-  // Load data from localStorage on mount
   useEffect(() => {
     const savedExpenses = localStorage.getItem("qopchiq-expenses");
     const savedMeals = localStorage.getItem("qopchiq-meals");
     const savedWater = localStorage.getItem("qopchiq-water");
     const savedLanguage = localStorage.getItem("qopchiq-language");
     const savedUserData = localStorage.getItem("qopchiq-userdata");
-    const savedWaterDate = localStorage.getItem("qopchiq-water-date");
-
-    const todayStr = new Date().toDateString();
 
     if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
     if (savedMeals) setMeals(JSON.parse(savedMeals));
     if (savedWater) setWaterIntake(Number.parseInt(savedWater));
-
-    if (savedWaterDate === todayStr && savedWater) {
-      setWaterIntake(Number.parseInt(savedWater));
-    } else {
-      setWaterIntake(0);
-      localStorage.setItem("qopchiq-water", "0");
-      localStorage.setItem("qopchiq-water-date", todayStr);
-    }
     if (savedLanguage) setLanguage(savedLanguage as "uz" | "ru" | "en");
     if (savedUserData) setUserData(JSON.parse(savedUserData));
   }, []);
 
-  // Calculate streak whenever data changes
   useEffect(() => {
     const newStreak = calculateStreak(expenses, meals, waterIntake);
-    setUserData((prev) => ({ ...prev, streak: newStreak }));
+    if (!isNaN(newStreak)) {
+      setUserData((prev) => {
+        const updated = { ...prev, streak: newStreak };
+        localStorage.setItem("qopchiq-userdata", JSON.stringify(updated));
+        return updated;
+      });
+    }
   }, [expenses, meals, waterIntake]);
 
-  // Save to localStorage whenever data changes
   useEffect(() => {
     localStorage.setItem("qopchiq-expenses", JSON.stringify(expenses));
   }, [expenses]);
@@ -103,16 +96,24 @@ export default function HomePage() {
 
   useEffect(() => {
     localStorage.setItem("qopchiq-water", waterIntake.toString());
-
-    // Also save daily water intake for streak calculation
     const today = new Date().toDateString();
     localStorage.setItem(`qopchiq-water-${today}`, waterIntake.toString());
-    localStorage.setItem("qopchiq-water-date", today);
   }, [waterIntake]);
 
   useEffect(() => {
     localStorage.setItem("qopchiq-userdata", JSON.stringify(userData));
   }, [userData]);
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const lastUpdated = localStorage.getItem("qopchiq-last-updated");
+
+    if (lastUpdated !== today) {
+      setWaterIntake(0); // Reset water
+      localStorage.setItem("qopchiq-last-updated", today);
+
+      // Optionally trigger other resets or updates like daily challenges, daily tips
+    }
+  }, []);
 
   const today = new Date();
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -144,28 +145,18 @@ export default function HomePage() {
     const newExpense = { ...expense, id: Date.now().toString() };
     setExpenses((prev) => [newExpense, ...prev]);
 
-    // Update points and level
-    const newPoints = userData.points + 10;
-    const newLevel = Math.floor(newPoints / 100) + 1;
-    setUserData((prev) => ({
-      ...prev,
-      points: newPoints,
-      level: newLevel,
-    }));
+    const newCoins = userData.coins + 10;
+    const newLevel = Math.floor(newCoins / 100) + 1;
+    setUserData((prev) => ({ ...prev, coins: newCoins, level: newLevel }));
   };
 
   const addMeal = (meal: Omit<Meal, "id">) => {
     const newMeal = { ...meal, id: Date.now().toString() };
     setMeals((prev) => [newMeal, ...prev]);
 
-    // Update points
-    const newPoints = userData.points + 5;
-    const newLevel = Math.floor(newPoints / 100) + 1;
-    setUserData((prev) => ({
-      ...prev,
-      points: newPoints,
-      level: newLevel,
-    }));
+    const newCoins = userData.coins + 5;
+    const newLevel = Math.floor(newCoins / 100) + 1;
+    setUserData((prev) => ({ ...prev, coins: newCoins, level: newLevel }));
   };
 
   const addWater = () => {
@@ -173,14 +164,9 @@ export default function HomePage() {
       const newWaterIntake = waterIntake + 1;
       setWaterIntake(newWaterIntake);
 
-      // Update points
-      const newPoints = userData.points + 2;
-      const newLevel = Math.floor(newPoints / 100) + 1;
-      setUserData((prev) => ({
-        ...prev,
-        points: newPoints,
-        level: newLevel,
-      }));
+      const newCoins = userData.coins + 2;
+      const newLevel = Math.floor(newCoins / 100) + 1;
+      setUserData((prev) => ({ ...prev, coins: newCoins, level: newLevel }));
     }
   };
 
@@ -225,7 +211,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 pb-20">
       <div className="max-w-md mx-auto space-y-6">
-        {/* Header */}
         <div className="text-center space-y-2 pt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -249,13 +234,10 @@ export default function HomePage() {
           <p className="text-gray-600 text-sm">{t.subtitle}</p>
         </div>
 
-        {/* Gamification Stats */}
         <Gamification userData={userData} language={language} />
-
-        {/* Daily Tip */}
+        <DailyFinanceDigest language={language} />
         <DailyTip language={language} />
 
-        {/* Monthly Budget Status */}
         <SpendingLimit
           monthlySpent={monthlySpent}
           monthlyLimit={userData.monthlyLimit}
@@ -265,7 +247,6 @@ export default function HomePage() {
           }
         />
 
-        {/* Today's Overview */}
         <div className="grid grid-cols-2 gap-4">
           <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="p-4 text-center">
@@ -288,7 +269,6 @@ export default function HomePage() {
           </Card>
         </div>
 
-        {/* Water Intake */}
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
@@ -308,15 +288,13 @@ export default function HomePage() {
               variant={waterIntake >= 8 ? "secondary" : "default"}
             >
               💧{" "}
-              {waterIntake >= 8 ? "Barakalla! +2 ball" : "Suv ichish (+2 ball)"}
+              {waterIntake >= 8
+                ? "Barakalla! +2 Qopchiq Coins"
+                : "Suv ichish (+2 Qopchiq Coins)"}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Health Stats */}
-        <HealthStats meals={todayMeals} language={language} />
-
-        {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
           <Button
             onClick={() => setShowExpenseModal(true)}
@@ -325,7 +303,7 @@ export default function HomePage() {
             <div className="text-center">
               <Plus className="h-6 w-6 mx-auto mb-1" />
               <div className="text-sm">{t.addExpense}</div>
-              <div className="text-xs opacity-80">+10 ball</div>
+              <div className="text-xs opacity-80">+10 Qopchiq Coins</div>
             </div>
           </Button>
 
@@ -336,15 +314,13 @@ export default function HomePage() {
             <div className="text-center">
               <Plus className="h-6 w-6 mx-auto mb-1" />
               <div className="text-sm">{t.addMeal}</div>
-              <div className="text-xs opacity-80">+5 ball</div>
+              <div className="text-xs opacity-80">+5 Qopchiq Coins</div>
             </div>
           </Button>
         </div>
 
-        {/* Recent Activity */}
         <ExpenseList expenses={todayExpenses.slice(0, 5)} language={language} />
 
-        {/* Modals */}
         <AddExpenseModal
           isOpen={showExpenseModal}
           onClose={() => setShowExpenseModal(false)}

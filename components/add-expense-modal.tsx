@@ -1,51 +1,94 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle } from "lucide-react"
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { AlertTriangle } from "lucide-react";
 
 interface Expense {
-  amount: number
-  category: string
-  emoji: string
-  description: string
-  date: string
-  mood?: string
+  amount: number;
+  category: string;
+  emoji: string;
+  description: string;
+  date: string;
+  mood?: string;
+  location?: string; // Added location field
 }
 
 interface AddExpenseModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onAdd: (expense: Expense) => void
-  language: "uz" | "ru" | "en"
-  currentBalance: number
-  monthlySpent: number
-  monthlyLimit: number
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (expense: Expense) => void;
+  language: "uz" | "ru" | "en";
+  currentBalance: number;
+  monthlySpent: number;
+  monthlyLimit: number;
 }
 
 const expenseCategories = [
   { emoji: "🍕", category: "food", uz: "Ovqat", ru: "Еда", en: "Food" },
-  { emoji: "🚗", category: "transport", uz: "Transport", ru: "Транспорт", en: "Transport" },
+  {
+    emoji: "🚗",
+    category: "transport",
+    uz: "Transport",
+    ru: "Транспорт",
+    en: "Transport",
+  },
   { emoji: "🏠", category: "home", uz: "Uy", ru: "Дом", en: "Home" },
-  { emoji: "👕", category: "clothes", uz: "Kiyim", ru: "Одежда", en: "Clothes" },
-  { emoji: "🎮", category: "entertainment", uz: "O'yin-kulgi", ru: "Развлечения", en: "Entertainment" },
-  { emoji: "💊", category: "health", uz: "Sog'liq", ru: "Здоровье", en: "Health" },
-  { emoji: "📚", category: "education", uz: "Ta'lim", ru: "Образование", en: "Education" },
+  {
+    emoji: "👕",
+    category: "clothes",
+    uz: "Kiyim",
+    ru: "Одежда",
+    en: "Clothes",
+  },
+  {
+    emoji: "🎮",
+    category: "entertainment",
+    uz: "O'yin-kulgi",
+    ru: "Развлечения",
+    en: "Entertainment",
+  },
+  {
+    emoji: "💊",
+    category: "health",
+    uz: "Sog'liq",
+    ru: "Здоровье",
+    en: "Health",
+  },
+  {
+    emoji: "📚",
+    category: "education",
+    uz: "Ta'lim",
+    ru: "Образование",
+    en: "Education",
+  },
   { emoji: "💰", category: "other", uz: "Boshqa", ru: "Другое", en: "Other" },
-]
+];
 
 const moods = [
   { emoji: "😊", mood: "happy", uz: "Xursand", ru: "Счастливый", en: "Happy" },
-  { emoji: "😐", mood: "neutral", uz: "Oddiy", ru: "Нейтральный", en: "Neutral" },
+  {
+    emoji: "😐",
+    mood: "neutral",
+    uz: "Oddiy",
+    ru: "Нейтральный",
+    en: "Neutral",
+  },
   { emoji: "😔", mood: "sad", uz: "G'amgin", ru: "Грустный", en: "Sad" },
   { emoji: "😤", mood: "stressed", uz: "Stress", ru: "Стресс", en: "Stressed" },
-]
+];
 
 export function AddExpenseModal({
   isOpen,
@@ -56,10 +99,13 @@ export function AddExpenseModal({
   monthlySpent,
   monthlyLimit,
 }: AddExpenseModalProps) {
-  const [amount, setAmount] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState(expenseCategories[0])
-  const [selectedMood, setSelectedMood] = useState(moods[0])
-  const [description, setDescription] = useState("")
+  const [amount, setAmount] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(
+    expenseCategories[0]
+  );
+  const [selectedMood, setSelectedMood] = useState(moods[0]);
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState(""); // New state for location
 
   const texts = {
     uz: {
@@ -68,6 +114,7 @@ export function AddExpenseModal({
       category: "Kategoriya",
       mood: "Kayfiyat",
       description: "Xarajat tafsilotlarini quyida kiriting",
+      location: "Joylashuv (ixtiyoriy)",
       add: "Qo'shish",
       cancel: "Bekor qilish",
       warning: "Ogohlantirish!",
@@ -82,6 +129,7 @@ export function AddExpenseModal({
       category: "Категория",
       mood: "Настроение",
       description: "Добавьте детали своего расхода ниже",
+      location: "Местоположение (необязательно)",
       add: "Добавить",
       cancel: "Отмена",
       warning: "Предупреждение!",
@@ -96,6 +144,7 @@ export function AddExpenseModal({
       category: "Category",
       mood: "Mood",
       description: "Add your expense details below",
+      location: "Location (optional)",
       add: "Add",
       cancel: "Cancel",
       warning: "Warning!",
@@ -104,18 +153,18 @@ export function AddExpenseModal({
       currentBalance: "Current Balance",
       monthlyRemaining: "Monthly Remaining",
     },
-  }
+  };
 
-  const t = texts[language]
+  const t = texts[language];
 
-  const expenseAmount = Number.parseFloat(amount) || 0
-  const exceedsBalance = expenseAmount > currentBalance
-  const exceedsLimit = monthlySpent + expenseAmount > monthlyLimit
-  const monthlyRemaining = monthlyLimit - monthlySpent
+  const expenseAmount = Number.parseFloat(amount) || 0;
+  const exceedsBalance = expenseAmount > currentBalance;
+  const exceedsLimit = monthlySpent + expenseAmount > monthlyLimit;
+  const monthlyRemaining = monthlyLimit - monthlySpent;
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!amount || Number.parseFloat(amount) <= 0) return
+    e.preventDefault();
+    if (!amount || Number.parseFloat(amount) <= 0) return;
 
     onAdd({
       amount: Number.parseFloat(amount),
@@ -124,22 +173,26 @@ export function AddExpenseModal({
       description,
       date: new Date().toISOString(),
       mood: selectedMood.mood,
-    })
+      location, // Include location
+    });
 
     // Reset form
-    setAmount("")
-    setDescription("")
-    setSelectedCategory(expenseCategories[0])
-    setSelectedMood(moods[0])
-    onClose()
-  }
+    setAmount("");
+    setDescription("");
+    setLocation(""); // Reset location
+    setSelectedCategory(expenseCategories[0]);
+    setSelectedMood(moods[0]);
+    onClose();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-sm mx-auto">
         <DialogHeader>
           <DialogTitle className="text-center">{t.title}</DialogTitle>
-          <DialogDescription>{t.description || "Add your expense details below"}</DialogDescription>
+          <DialogDescription>
+            {t.description || "Add your expense details below"}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -191,7 +244,11 @@ export function AddExpenseModal({
                 <Button
                   key={cat.category}
                   type="button"
-                  variant={selectedCategory.category === cat.category ? "default" : "outline"}
+                  variant={
+                    selectedCategory.category === cat.category
+                      ? "default"
+                      : "outline"
+                  }
                   className="h-16 flex flex-col gap-1"
                   onClick={() => setSelectedCategory(cat)}
                 >
@@ -209,7 +266,9 @@ export function AddExpenseModal({
                 <Button
                   key={mood.mood}
                   type="button"
-                  variant={selectedMood.mood === mood.mood ? "default" : "outline"}
+                  variant={
+                    selectedMood.mood === mood.mood ? "default" : "outline"
+                  }
                   className="h-12 flex flex-col gap-1"
                   onClick={() => setSelectedMood(mood)}
                 >
@@ -231,8 +290,23 @@ export function AddExpenseModal({
             />
           </div>
 
+          <div>
+            <Label htmlFor="location">{t.location}</Label>
+            <Input
+              id="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Masalan: Supermarket, Kafe"
+            />
+          </div>
+
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1 bg-transparent"
+            >
               {t.cancel}
             </Button>
             <Button type="submit" className="flex-1" disabled={exceedsBalance}>
@@ -242,5 +316,5 @@ export function AddExpenseModal({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
