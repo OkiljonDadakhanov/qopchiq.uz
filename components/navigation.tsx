@@ -88,8 +88,8 @@ export function Navigation({ language }: NavigationProps) {
 
   ];
 
-  const visibleItems = navItems.slice(0, 5);
-  const overflowItems = navItems.slice(5);
+  const visibleItems = navItems.slice(0, 4);
+  const overflowItems = navItems.slice(4);
 
   return (
     <>
