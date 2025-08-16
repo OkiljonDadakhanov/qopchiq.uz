@@ -1,8 +1,8 @@
-const User = require("../models/User")
-const asyncHandler = require("../utils/asyncHandler")
-const { sendResponse, sendError } = require("../utils/apiResponse")
-const { generateToken } = require("../middleware/auth")
-const jwt = require("jsonwebtoken") // Import jwt module
+const User = require("../models/User");
+const asyncHandler = require("../utils/asyncHandler");
+const { sendResponse, sendError } = require("../utils/apiResponse");
+const { generateToken } = require("../middleware/auth");
+const jwt = require("jsonwebtoken"); // Import jwt module
 const bcrypt = require("bcryptjs");
 
 // @desc    Register user with email and password
@@ -28,17 +28,22 @@ const registerWithEmail = asyncHandler(async (req, res) => {
     lastActive: new Date(),
   });
   const token = generateToken(user._id);
-  sendResponse(res, 201, {
-    token,
-    user: {
-      id: user._id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      language: user.language,
+  sendResponse(
+    res,
+    201,
+    {
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        language: user.language,
+      },
     },
-  }, "Registration successful");
+    "Registration successful"
+  );
 });
 
 // @desc    Login user with email and password
@@ -58,38 +63,44 @@ const loginWithEmail = asyncHandler(async (req, res) => {
     return sendError(res, 400, "Invalid email or password");
   }
   const token = generateToken(user._id);
-  sendResponse(res, 200, {
-    token,
-    user: {
-      id: user._id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      language: user.language,
+  sendResponse(
+    res,
+    200,
+    {
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        language: user.language,
+      },
     },
-  }, "Login successful");
+    "Login successful"
+  );
 });
 
 // @desc    Authenticate user with Telegram data and get JWT token
 // @route   POST /api/auth/telegram
 // @access  Public
 const authenticateWithTelegram = asyncHandler(async (req, res) => {
-  const { telegramId, username, firstName, lastName, language, photoUrl } = req.body
+  const { telegramId, username, firstName, lastName, language, photoUrl } =
+    req.body;
 
   try {
     // Find existing user or create new one
-    let user = await User.findOne({ telegramId })
+    let user = await User.findOne({ telegramId });
 
     if (user) {
       // Update existing user with latest Telegram data
-      user.username = username || user.username
-      user.firstName = firstName || user.firstName
-      user.lastName = lastName || user.lastName
-      user.language = language || user.language
-      user.lastActive = new Date()
+      user.username = username || user.username;
+      user.firstName = firstName || user.firstName;
+      user.lastName = lastName || user.lastName;
+      user.language = language || user.language;
+      user.lastActive = new Date();
 
-      await user.save()
+      await user.save();
     } else {
       // Create new user
       user = await User.create({
@@ -99,11 +110,11 @@ const authenticateWithTelegram = asyncHandler(async (req, res) => {
         lastName,
         language: language || "uz",
         lastActive: new Date(),
-      })
+      });
     }
 
     // Generate JWT token
-    const token = generateToken(user._id)
+    const token = generateToken(user._id);
 
     // Set cookie (optional)
     const cookieOptions = {
@@ -111,9 +122,9 @@ const authenticateWithTelegram = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-    }
+    };
 
-    res.cookie("token", token, cookieOptions)
+    res.cookie("token", token, cookieOptions);
 
     sendResponse(
       res,
@@ -136,52 +147,55 @@ const authenticateWithTelegram = asyncHandler(async (req, res) => {
           lastActive: user.lastActive,
         },
       },
-      "Authentication successful",
-    )
+      "Authentication successful"
+    );
   } catch (error) {
-    console.error("Telegram auth error:", error)
-    sendError(res, 500, "Authentication failed")
+    console.error("Telegram auth error:", error);
+    sendError(res, 500, "Authentication failed");
   }
-})
+});
 
 // @desc    Refresh JWT token
 // @route   POST /api/auth/refresh
 // @access  Public (requires valid token)
 const refreshToken = asyncHandler(async (req, res) => {
-  let token
+  let token;
 
   // Get token from header or cookie
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    token = req.headers.authorization.split(" ")[1]
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
   } else if (req.cookies && req.cookies.token) {
-    token = req.cookies.token
+    token = req.cookies.token;
   }
 
   if (!token) {
-    return sendError(res, 401, "No token provided")
+    return sendError(res, 401, "No token provided");
   }
 
   try {
     // Verify current token (even if expired, we can still decode it)
-    const decoded = jwt.decode(token)
+    const decoded = jwt.decode(token);
 
     if (!decoded || !decoded.userId) {
-      return sendError(res, 401, "Invalid token format")
+      return sendError(res, 401, "Invalid token format");
     }
 
     // Get user from database
-    const user = await User.findById(decoded.userId)
+    const user = await User.findById(decoded.userId);
 
     if (!user || !user.isActive) {
-      return sendError(res, 401, "User not found or inactive")
+      return sendError(res, 401, "User not found or inactive");
     }
 
     // Generate new token
-    const newToken = generateToken(user._id)
+    const newToken = generateToken(user._id);
 
     // Update last active
-    user.lastActive = new Date()
-    await user.save()
+    user.lastActive = new Date();
+    await user.save();
 
     // Set new cookie
     const cookieOptions = {
@@ -189,9 +203,9 @@ const refreshToken = asyncHandler(async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-    }
+    };
 
-    res.cookie("token", newToken, cookieOptions)
+    res.cookie("token", newToken, cookieOptions);
 
     sendResponse(
       res,
@@ -207,12 +221,12 @@ const refreshToken = asyncHandler(async (req, res) => {
           coins: user.coins,
         },
       },
-      "Token refreshed successfully",
-    )
+      "Token refreshed successfully"
+    );
   } catch (error) {
-    sendError(res, 401, "Token refresh failed")
+    sendError(res, 401, "Token refresh failed");
   }
-})
+});
 
 // @desc    Logout user (clear cookie)
 // @route   POST /api/auth/logout
@@ -224,16 +238,16 @@ const logout = asyncHandler(async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-  })
+  });
 
-  sendResponse(res, 200, {}, "Logged out successfully")
-})
+  sendResponse(res, 200, {}, "Logged out successfully");
+});
 
 // @desc    Get current user profile
 // @route   GET /api/auth/profile
 // @access  Private
 const getProfile = asyncHandler(async (req, res) => {
-  const user = req.user
+  const user = req.user;
 
   sendResponse(
     res,
@@ -259,34 +273,34 @@ const getProfile = asyncHandler(async (req, res) => {
         joinedAt: user.joinedAt,
       },
     },
-    "Profile retrieved successfully",
-  )
-})
+    "Profile retrieved successfully"
+  );
+});
 
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private
 const updateProfile = asyncHandler(async (req, res) => {
-  const user = req.user
-  const updateData = req.body
+  const user = req.user;
+  const updateData = req.body;
 
   // Remove fields that shouldn't be updated
-  delete updateData.telegramId
-  delete updateData.coins
-  delete updateData.level
-  delete updateData.streak
-  delete updateData.badges
-  delete updateData.joinedAt
+  delete updateData.telegramId;
+  delete updateData.coins;
+  delete updateData.level;
+  delete updateData.streak;
+  delete updateData.badges;
+  delete updateData.joinedAt;
 
   // Update user
   Object.keys(updateData).forEach((key) => {
     if (updateData[key] !== undefined) {
-      user[key] = updateData[key]
+      user[key] = updateData[key];
     }
-  })
+  });
 
-  user.lastActive = new Date()
-  await user.save()
+  user.lastActive = new Date();
+  await user.save();
 
   sendResponse(
     res,
@@ -310,9 +324,9 @@ const updateProfile = asyncHandler(async (req, res) => {
         lastActive: user.lastActive,
       },
     },
-    "Profile updated successfully",
-  )
-})
+    "Profile updated successfully"
+  );
+});
 
 module.exports = {
   authenticateWithTelegram,
@@ -320,4 +334,6 @@ module.exports = {
   logout,
   getProfile,
   updateProfile,
-}
+  registerWithEmail,
+  loginWithEmail,
+};

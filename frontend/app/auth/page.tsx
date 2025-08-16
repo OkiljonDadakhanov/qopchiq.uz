@@ -3,7 +3,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,7 +24,13 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { login, isAuthenticated, telegramWebApp, isTelegramAvailable, loading: authLoading } = useAuth();
+  const {
+    login,
+    isAuthenticated,
+    telegramWebApp,
+    isTelegramAvailable,
+    loading: authLoading,
+  } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -29,7 +41,9 @@ export default function AuthPage() {
 
   const handleTelegramLogin = async () => {
     if (!telegramWebApp) {
-      setError("Telegram Web App is not available. Please open this app from Telegram.");
+      setError(
+        "Telegram Web App is not available. Please open this app from Telegram."
+      );
       return;
     }
 
@@ -60,7 +74,7 @@ export default function AuthPage() {
     }
   };
 
-  const handleManualLogin = async (e: { preventDefault: () => void; }) => {
+  const handleManualLogin = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     if (!telegramId.trim()) {
       setError("Telegram ID is required");
@@ -149,7 +163,8 @@ export default function AuthPage() {
               <Alert>
                 <Globe className="h-4 w-4" />
                 <AlertDescription>
-                  Running in development mode. Use demo login, manual login, or open from Telegram for full features.
+                  Running in development mode. Use demo login, manual login, or
+                  open from Telegram for full features.
                 </AlertDescription>
               </Alert>
             )}
@@ -276,9 +291,10 @@ export default function AuthPage() {
                 className="text-blue-600 hover:text-blue-700"
               >
                 {isManualMode
-                  ? (isTelegramAvailable ? "Use Telegram Login" : "Manual Login Only")
-                  : "Manual Login"
-                }
+                  ? isTelegramAvailable
+                    ? "Use Telegram Login"
+                    : "Manual Login Only"
+                  : "Manual Login"}
               </Button>
             </div>
 
