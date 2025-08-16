@@ -20,7 +20,7 @@ interface Expense {
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
-  const [language, setLanguage] = useState<"uz" | "ru" | "en">("uz")
+  const [language, setLanguage] = useState<"uz" | "en">("uz")
   const [showAddModal, setShowAddModal] = useState(false)
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
@@ -31,7 +31,8 @@ export default function ExpensesPage() {
     const savedLanguage = localStorage.getItem("qopchiq-language")
 
     if (savedExpenses) setExpenses(JSON.parse(savedExpenses))
-    if (savedLanguage) setLanguage(savedLanguage as "uz" | "ru" | "en")
+  if (savedLanguage === "en") setLanguage("en");
+  else setLanguage("uz");
   }, [])
 
   const texts = {
@@ -50,21 +51,6 @@ export default function ExpensesPage() {
       categories: "Kategoriyalar",
       noExpenses: "Xarajatlar topilmadi",
     },
-    ru: {
-      title: "Расходы",
-      addExpense: "Добавить расход",
-      search: "Поиск",
-      filter: "Фильтр",
-      all: "Все",
-      today: "Сегодня",
-      week: "На этой неделе",
-      month: "В этом месяце",
-      total: "Всего",
-      average: "Среднее",
-      highest: "Самый высокий",
-      categories: "Категории",
-      noExpenses: "Расходы не найдены",
-    },
     en: {
       title: "Expenses",
       addExpense: "Add Expense",
@@ -80,9 +66,9 @@ export default function ExpensesPage() {
       categories: "Categories",
       noExpenses: "No expenses found",
     },
-  }
+  };
 
-  const t = texts[language]
+  const t = texts[language];
 
   const addExpense = (expense: Omit<Expense, "id">) => {
     const newExpense = { ...expense, id: Date.now().toString() }

@@ -32,6 +32,7 @@ class ApiClient {
         ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
+      credentials: "include", // Include cookies for JWT refresh
       ...options,
     };
 
@@ -44,6 +45,30 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle 401 Unauthorized - try to refresh token
+        if (response.status === 401 && token) {
+          try {
+            const newToken = await this.refreshToken();
+            if (newToken) {
+              // Retry the original request with new token
+              config.headers.Authorization = `Bearer ${newToken}`;
+              const retryResponse = await fetch(url, config);
+              const retryData = await retryResponse.json();
+
+              if (!retryResponse.ok) {
+                throw new Error(retryData.message || "API request failed");
+              }
+              return retryData;
+            }
+          } catch (refreshError) {
+            // Refresh failed, clear token and throw original error
+            this.setToken(null);
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("auth_token");
+            }
+          }
+        }
+
         throw new Error(data.message || "API request failed");
       }
 
@@ -61,11 +86,34 @@ class ApiClient {
       body: telegramData,
     });
 
-    if (response.token) {
-      this.setToken(response.token);
+    if (response.success && response.data?.token) {
+      this.setToken(response.data.token);
     }
 
     return response;
+  }
+
+  async logout() {
+    return this.request("/auth/logout", {
+      method: "POST",
+    });
+  }
+
+  async refreshToken() {
+    try {
+      const response = await this.request("/auth/refresh", {
+        method: "POST",
+      });
+
+      if (response.success && response.data?.token) {
+        this.setToken(response.data.token);
+        return response.data.token;
+      }
+      return null;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      return null;
+    }
   }
 
   async getProfile() {
@@ -82,6 +130,10 @@ class ApiClient {
       method: "PUT",
       body: userData,
     });
+  }
+
+  async getUserStats(telegramId) {
+    return this.request(`/users/${telegramId}/stats`);
   }
 
   // Expense methods
@@ -114,6 +166,10 @@ class ApiClient {
     return this.request(`/expenses/analytics?period=${period}`);
   }
 
+  async getRecentExpenses() {
+    return this.request("/expenses/recent");
+  }
+
   // Meal methods
   async getMeals(params = {}) {
     const queryString = new URLSearchParams(params).toString();
@@ -144,6 +200,15 @@ class ApiClient {
     return this.request(`/meals/analytics?period=${period}`);
   }
 
+  async getRecentMeals() {
+    return this.request("/meals/recent");
+  }
+
+  async getDailyCalories(date) {
+    const queryString = date ? `?date=${date}` : "";
+    return this.request(`/meals/daily-calories${queryString}`);
+  }
+
   // Health methods
   async calculateBMI(healthData) {
     return this.request("/health/bmi", {
@@ -167,6 +232,17 @@ class ApiClient {
     });
   }
 
+  async logExercise(exerciseData) {
+    return this.request("/health/exercise", {
+      method: "POST",
+      body: exerciseData,
+    });
+  }
+
+  async getExerciseHistory(userId) {
+    return this.request(`/health/exercise?userId=${userId}`);
+  }
+
   // Gamification methods
   async earnCoins(coinData) {
     return this.request("/gamification/earn-coins", {
@@ -175,37 +251,68 @@ class ApiClient {
     });
   }
 
-  async getLeaderboard(type = "coins") {
-    return this.request(`/gamification/leaderboard?type=${type}`);
+  async getLeaderboard(type = "coins", limit = 10, period = "all") {
+    const params = new URLSearchParams({ type, limit, period });
+    return this.request(`/gamification/leaderboard?${params}`);
   }
 
-  async getUserBadges(userId) {
-    return this.request(`/gamification/badges?userId=${userId}`);
+  async getUserBadges(userId, category) {
+    const params = new URLSearchParams({ userId });
+    if (category) params.append("category", category);
+    return this.request(`/gamification/badges?${params}`);
   }
 
-  async getChallenges(userId) {
-    return this.request(`/gamification/challenges?userId=${userId}`);
+  async getChallenges(userId, status = "all") {
+    const params = new URLSearchParams({ userId, status });
+    return this.request(`/gamification/challenges?${params}`);
+  }
+
+  async joinChallenge(challengeData) {
+    return this.request("/gamification/challenges/join", {
+      method: "POST",
+      body: challengeData,
+    });
+  }
+
+  async updateChallengeProgress(progressData) {
+    return this.request("/gamification/challenges/progress", {
+      method: "POST",
+      body: progressData,
+    });
+  }
+
+  async levelUp(userId) {
+    return this.request("/gamification/level-up", {
+      method: "POST",
+      body: { userId },
+    });
   }
 
   // Analytics methods
   async getOverviewAnalytics(userId, period = "month") {
-    return this.request(
-      `/analytics/overview?userId=${userId}&period=${period}`
-    );
+    const params = new URLSearchParams({ userId, period });
+    return this.request(`/analytics/overview?${params}`);
   }
 
-  async getExpenseAnalyticsDetailed(userId, period = "month") {
-    return this.request(
-      `/analytics/expenses?userId=${userId}&period=${period}`
-    );
+  async getExpenseAnalyticsDetailed(
+    userId,
+    period = "month",
+    category,
+    comparison = false
+  ) {
+    const params = new URLSearchParams({ userId, period, comparison });
+    if (category) params.append("category", category);
+    return this.request(`/analytics/expenses?${params}`);
   }
 
-  async getMealAnalyticsDetailed(userId, period = "month") {
-    return this.request(`/analytics/meals?userId=${userId}&period=${period}`);
+  async getMealAnalyticsDetailed(userId, period = "month", comparison = false) {
+    const params = new URLSearchParams({ userId, period, comparison });
+    return this.request(`/analytics/meals?${params}`);
   }
 
   async getHealthAnalytics(userId, period = "month") {
-    return this.request(`/analytics/health?userId=${userId}&period=${period}`);
+    const params = new URLSearchParams({ userId, period });
+    return this.request(`/analytics/health?${params}`);
   }
 }
 
