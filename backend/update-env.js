@@ -16,6 +16,7 @@ function updateEnvFile() {
     "JWT_SECRET=qopchiq-jwt-secret-key-2024-development",
     "JWT_EXPIRE=30d",
     "FRONTEND_URL=http://localhost:3000",
+    "FRONTEND_URL=https://qopchiq-uz.vercel.app/",
   ];
 
   // Combine all environment variables
