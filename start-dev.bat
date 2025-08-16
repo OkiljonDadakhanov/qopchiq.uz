@@ -1,20 +1,21 @@
 @echo off
-echo Starting Qopchiq.uz Development Environment...
+echo 🚀 Starting Qopchiq.uz Development Servers...
 echo.
 
-echo Starting Backend Server...
-start "Backend Server" cmd /k "cd backend && npm run dev"
+echo 📡 Starting Backend Server...
+start "Backend Server" cmd /k "cd backend && npm start"
 
-echo Waiting for backend to start...
-timeout /t 5 /nobreak > nul
-
-echo Starting Frontend Server...
+echo 🌐 Starting Frontend Server...
 start "Frontend Server" cmd /k "cd frontend && npm run dev"
 
 echo.
-echo Development servers are starting...
-echo Backend: http://localhost:5000
-echo Frontend: http://localhost:3000
+echo ✅ Both servers are starting...
+echo 📱 Frontend: http://localhost:3000
+echo 🔧 Backend: http://localhost:5000
+echo 📊 Health Check: http://localhost:5000/health
 echo.
-echo Press any key to close this window...
-pause > nul
+echo 🎯 Demo Login:
+echo    Email: demo@qopchiq.uz
+echo    Password: demo123
+echo.
+pause

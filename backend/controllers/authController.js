@@ -4,11 +4,26 @@ const { sendResponse, sendError } = require("../utils/apiResponse");
 const { generateToken } = require("../middleware/auth");
 const jwt = require("jsonwebtoken"); // Import jwt module
 const bcrypt = require("bcryptjs");
+const mongoose = require("mongoose");
+
+// Helper function to check if database is connected
+const isDatabaseConnected = () => {
+  return mongoose.connection.readyState === 1;
+};
 
 // @desc    Register user with email and password
 // @route   POST /api/auth/register
 // @access  Public
 const registerWithEmail = asyncHandler(async (req, res) => {
+  // Check if database is connected
+  if (!isDatabaseConnected()) {
+    return sendError(
+      res,
+      503,
+      "Database is not available. Please try again later."
+    );
+  }
+
   const { email, password, username, firstName, lastName, language } = req.body;
   if (!email || !password) {
     return sendError(res, 400, "Email and password are required");
@@ -50,6 +65,15 @@ const registerWithEmail = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const loginWithEmail = asyncHandler(async (req, res) => {
+  // Check if database is connected
+  if (!isDatabaseConnected()) {
+    return sendError(
+      res,
+      503,
+      "Database is not available. Please try again later."
+    );
+  }
+
   const { email, password } = req.body;
   if (!email || !password) {
     return sendError(res, 400, "Email and password are required");
@@ -85,6 +109,15 @@ const loginWithEmail = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/telegram
 // @access  Public
 const authenticateWithTelegram = asyncHandler(async (req, res) => {
+  // Check if database is connected
+  if (!isDatabaseConnected()) {
+    return sendError(
+      res,
+      503,
+      "Database is not available. Please try again later."
+    );
+  }
+
   const { telegramId, username, firstName, lastName, language, photoUrl } =
     req.body;
 
@@ -159,6 +192,15 @@ const authenticateWithTelegram = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/refresh
 // @access  Public (requires valid token)
 const refreshToken = asyncHandler(async (req, res) => {
+  // Check if database is connected
+  if (!isDatabaseConnected()) {
+    return sendError(
+      res,
+      503,
+      "Database is not available. Please try again later."
+    );
+  }
+
   let token;
 
   // Get token from header or cookie
@@ -176,11 +218,16 @@ const refreshToken = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Verify current token (even if expired, we can still decode it)
-    const decoded = jwt.decode(token);
-
-    if (!decoded || !decoded.userId) {
-      return sendError(res, 401, "Invalid token format");
+    // Try to verify the token first
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtError) {
+      // If token is expired, try to decode it to get user ID
+      decoded = jwt.decode(token);
+      if (!decoded || !decoded.userId) {
+        return sendError(res, 401, "Invalid token format");
+      }
     }
 
     // Get user from database
@@ -224,6 +271,7 @@ const refreshToken = asyncHandler(async (req, res) => {
       "Token refreshed successfully"
     );
   } catch (error) {
+    console.error("Token refresh error:", error);
     sendError(res, 401, "Token refresh failed");
   }
 });
@@ -247,6 +295,15 @@ const logout = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 const getProfile = asyncHandler(async (req, res) => {
+  // Check if database is connected
+  if (!isDatabaseConnected()) {
+    return sendError(
+      res,
+      503,
+      "Database is not available. Please try again later."
+    );
+  }
+
   const user = req.user;
 
   sendResponse(
@@ -281,6 +338,15 @@ const getProfile = asyncHandler(async (req, res) => {
 // @route   PUT /api/auth/profile
 // @access  Private
 const updateProfile = asyncHandler(async (req, res) => {
+  // Check if database is connected
+  if (!isDatabaseConnected()) {
+    return sendError(
+      res,
+      503,
+      "Database is not available. Please try again later."
+    );
+  }
+
   const user = req.user;
   const updateData = req.body;
 

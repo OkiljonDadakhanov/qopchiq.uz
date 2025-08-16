@@ -1,347 +1,276 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Droplets, LogOut } from "lucide-react";
-
-// Import components (keep your paths)
-import { AddExpenseModal as AddExpenseModalBase } from "@/components/add-expense-modal";
-import { AddMealModal as AddMealModalBase } from "@/components/add-meal-modal";
-import { ExpenseList } from "@/components/expense-list";
-import { DailyTip } from "@/components/daily-tip";
-import { SpendingLimit as SpendingLimitBase } from "@/components/spending-limit";
-import { Gamification as GamificationBase } from "@/components/gamification";
-import { Navigation as NavigationBase } from "@/components/navigation";
-import { DailyFinanceDigest as DailyFinanceDigestBase } from "@/components/daily-finance-suggest";
-import ProtectedRoute from "@/components/protected-route";
-
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Mail, Lock, User, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { apiClient } from "@/lib/api";
-
-// ---------- Types (restore these) ----------
-interface Expense {
-  id: string;
-  amount: number;
-  category: string;
-  emoji: string;
-  description: string;
-  date: string;
-  mood?: string;
-  location?: string;
-}
-
-interface Meal {
-  id: string;
-  name: string;
-  calories: number;
-  emoji: string;
-  date: string;
-  category: "protein" | "carbs" | "veggies" | "sweets";
-}
-
-interface UserData {
-  monthlyLimit: number;
-  currentBalance: number;
-  level: number;
-  coins: number;
-  streak: number;
-  badges: string[];
-}
-// -------------------------------------------
-
-// Temporary: relax prop types to unblock rendering.
-// Later, replace these aliases with proper props or fix the child component prop interfaces.
-const SpendingLimit = SpendingLimitBase as unknown as React.ComponentType<any>;
-const DailyFinanceDigest =
-  DailyFinanceDigestBase as unknown as React.ComponentType<any>;
-const Gamification = GamificationBase as unknown as React.ComponentType<any>;
-const AddExpenseModal =
-  AddExpenseModalBase as unknown as React.ComponentType<any>;
-const AddMealModal = AddMealModalBase as unknown as React.ComponentType<any>;
-const Navigation = NavigationBase as unknown as React.ComponentType<any>;
 
 export default function HomePage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [meals, setMeals] = useState<Meal[]>([]);
-  const [waterIntake, setWaterIntake] = useState(0);
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [showMealModal, setShowMealModal] = useState(false);
-  const [language, setLanguage] = useState<"uz" | "en">("uz");
-  const [userData, setUserData] = useState<UserData>({
-    monthlyLimit: 1000000,
-    currentBalance: 0,
-    level: 1,
-    coins: 0,
-    streak: 0,
-    badges: [],
-  });
-
-  // Use auth's loading; keep local loading only for page data
-  const { user, logout, loading: authLoading, isAuthenticated } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
+  const { user, login, register, isAuthenticated, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // If user is already authenticated, redirect to dashboard
   useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated || !user) {
+    if (isAuthenticated && user && !authLoading) {
+      console.log("User authenticated, redirecting to dashboard");
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, user, authLoading, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      if (isSignUp) {
+        const response = await register(email, password, username, firstName, lastName);
+        if (response.success) {
+          setSuccess("Account created successfully! Redirecting to dashboard...");
+          setTimeout(() => {
+            console.log("Redirecting to dashboard after registration");
+            router.push("/dashboard");
+          }, 1500);
+        } else {
+          setError(response.message || "Registration failed");
+        }
+      } else {
+        const response = await login(email, password);
+        if (response.success) {
+          setSuccess("Login successful! Redirecting to dashboard...");
+          setTimeout(() => {
+            console.log("Redirecting to dashboard after login");
+            router.push("/dashboard");
+          }, 1500);
+        } else {
+          setError(response.message || "Login failed");
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || "An error occurred");
+    } finally {
       setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        await loadUserData(user.telegramId);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, isAuthenticated, user]);
-
-  const loadUserData = async (telegramId: string) => {
-    try {
-      const [userStats, userExpenses, userMeals] = await Promise.all([
-        apiClient.getUserStats(telegramId),
-        apiClient.getExpenses({ userId: telegramId, limit: 50 }),
-        apiClient.getMeals({ userId: telegramId, limit: 50 }),
-      ]);
-
-      if (userStats.success) {
-        const data = userStats.data || {};
-        setUserData({
-          monthlyLimit: data.monthlyLimit ?? 1000000,
-          currentBalance: data.currentBalance ?? 0,
-          level: data.level ?? 1,
-          coins: data.coins ?? 0,
-          streak: data.streak ?? 0,
-          badges: data.badges ?? [],
-        });
-      }
-      if (userExpenses.success) setExpenses(userExpenses.data?.expenses ?? []);
-      if (userMeals.success) setMeals(userMeals.data?.meals ?? []);
-      if (user?.language) setLanguage(user.language);
-    } catch (e) {
-      console.error("Failed to load user data:", e);
     }
   };
 
-  const handleAddExpense = async (expenseData: any) => {
-    if (!user?.telegramId) return;
-    try {
-      const res = await apiClient.createExpense({
-        ...expenseData,
-        userId: user.telegramId,
-      });
-      if (res.success) {
-        setExpenses((prev) => [res.data, ...prev]);
-        setShowExpenseModal(false);
-        loadUserData(user.telegramId); // refresh, non-blocking
-      }
-    } catch (e) {
-      console.error("Failed to add expense:", e);
-    }
+  const toggleMode = () => {
+    setIsSignUp(!isSignUp);
+    setError("");
+    setSuccess("");
   };
 
-  const handleAddMeal = async (mealData: any) => {
-    if (!user?.telegramId) return;
-    try {
-      const res = await apiClient.createMeal({
-        ...mealData,
-        userId: user.telegramId,
-      });
-      if (res.success) {
-        setMeals((prev) => [res.data, ...prev]);
-        setShowMealModal(false);
-        loadUserData(user.telegramId);
-      }
-    } catch (e) {
-      console.error("Failed to add meal:", e);
-    }
-  };
-
-  const handleWaterIntake = async (amount: number) => {
-    if (!user?.telegramId) return;
-    try {
-      await apiClient.trackWater({ userId: user.telegramId, amount });
-      setWaterIntake((prev) => prev + amount);
-    } catch (e) {
-      console.error("Failed to track water intake:", e);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (e) {
-      console.error("Logout failed:", e);
-    }
-  };
-
-  const busy = authLoading || loading;
-
-  if (busy) {
+  // Show loading while checking authentication
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading your data...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is authenticated, show loading while redirecting
+  if (isAuthenticated && user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Redirecting to dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold text-lg">
-                  {user?.firstName?.[0] || user?.username?.[0] || "U"}
-                </span>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo/Brand */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Qopchiq.uz</h1>
+          <p className="text-gray-600">Track your finances and health in one place</p>
+        </div>
+
+        <Card className="w-full">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-gray-900">
+              {isSignUp ? "Create Your Account" : "Welcome Back"}
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              {isSignUp
+                ? "Join thousands of users tracking their finances and health"
+                : "Sign in to continue your journey"
+              }
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {isSignUp && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="firstName">First Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="firstName"
+                          type="text"
+                          placeholder="First Name"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="lastName"
+                          type="text"
+                          placeholder="Last Name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="username">Username (Optional)</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="username"
+                        type="text"
+                        placeholder="Username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">
-                  {user?.firstName || user?.username || "User"}
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Level {userData.level} • {userData.coins} coins
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-
-        {/* Main */}
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="flex space-x-4">
-                <Button
-                  onClick={() => setShowExpenseModal(true)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Expense
-                </Button>
-                <Button
-                  onClick={() => setShowMealModal(true)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Meal
-                </Button>
-              </div>
-
-              {/* Spending limit */}
-              <SpendingLimit
-                monthlyLimit={userData.monthlyLimit}
-                currentBalance={userData.currentBalance}
-                language={language}
-              />
-
-              {/* Recent expenses */}
-              <Card>
-                <CardContent className="p-6">
-                  <h2 className="text-xl font-semibold mb-4">
-                    {language === "uz"
-                      ? "So'nggi xarajatlar"
-                      : "Recent Expenses"}
-                  </h2>
-                  <ExpenseList
-                    expenses={expenses.slice(0, 5)}
-                    language={language}
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="pl-10"
                   />
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {/* Digest */}
-              <DailyFinanceDigest
-                expenses={expenses}
-                meals={meals}
-                language={language}
-              />
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="pl-10 pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {success && (
+                <Alert>
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isSignUp ? "Creating Account..." : "Signing In..."}
+                  </>
+                ) : (
+                  <>
+                    {isSignUp ? "Create Account" : "Sign In"}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <Button
+                variant="link"
+                onClick={toggleMode}
+                className="text-blue-600 hover:text-blue-700"
+              >
+                {isSignUp
+                  ? "Already have an account? Sign in"
+                  : "Don't have an account? Sign up"
+                }
+              </Button>
             </div>
 
-            {/* Right */}
-            <div className="space-y-6">
-              <Gamification
-                level={userData.level}
-                coins={userData.coins}
-                streak={userData.streak}
-                badges={userData.badges}
-                language={language}
-              />
-
-              {/* Water */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold flex items-center">
-                      <Droplets className="h-5 w-5 mr-2 text-blue-500" />
-                      {language === "uz" ? "Suv ichish" : "Water Intake"}
-                    </h3>
-                    <Badge variant="secondary">{waterIntake}ml</Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleWaterIntake(250)}
-                      className="w-full"
-                    >
-                      +250ml
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleWaterIntake(500)}
-                      className="w-full"
-                    >
-                      +500ml
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <DailyTip language={language} />
+            <div className="mt-4 text-center text-sm text-gray-500">
+              <p>Demo Account (for testing):</p>
+              <p>Email: demo@qopchiq.uz</p>
+              <p>Password: demo123</p>
             </div>
-          </div>
-        </div>
-
-        {/* Modals */}
-        <AddExpenseModal
-          open={showExpenseModal}
-          onClose={() => setShowExpenseModal(false)}
-          onSubmit={handleAddExpense}
-          language={language}
-        />
-        <AddMealModal
-          open={showMealModal}
-          onClose={() => setShowMealModal(false)}
-          onSubmit={handleAddMeal}
-          language={language}
-        />
-
-        <Navigation activePage="home" language={language} />
+          </CardContent>
+        </Card>
       </div>
-    </ProtectedRoute>
+    </div>
   );
 }

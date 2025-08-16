@@ -7,11 +7,11 @@ import React, {
   useState,
   PropsWithChildren,
 } from 'react';
-import { apiClient } from '@/lib/api';
+import { apiClient } from '@/lib/api'; // or '../lib/api' if you don't use @ alias
 
 export interface User {
   _id: string;
-  telegramId: string;
+  email: string;
   username?: string;
   firstName?: string;
   lastName?: string;
@@ -38,14 +38,18 @@ export interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
-  telegramWebApp: any | null;
-  isTelegramAvailable: boolean;
-  login: (telegramData: any) => Promise<any>;
+  login: (email: string, password: string) => Promise<any>;
+  register: (
+    email: string,
+    password: string,
+    username?: string,
+    firstName?: string,
+    lastName?: string
+  ) => Promise<any>;
   logout: () => Promise<void>;
   updateUser: (userData: any) => Promise<any>;
   checkAuth: () => Promise<void>;
   refreshToken: () => Promise<string | null>;
-  handleTelegramAuth: (telegramUser: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -60,35 +64,19 @@ const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [telegramWebApp, setTelegramWebApp] = useState<any | null>(null);
-  const [isTelegramAvailable, setIsTelegramAvailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     const boot = async () => {
       try {
-        const tg = (window as any)?.Telegram?.WebApp;
-        const hasTG = Boolean(tg);
-        const hasTGUser = Boolean(tg?.initDataUnsafe?.user);
-
-        if (hasTG) {
-          setTelegramWebApp(tg);
-          setIsTelegramAvailable(true);
-
-          // Guard Telegram-only APIs to avoid warnings
-          try { tg.expand?.(); } catch { }
-          const v = parseFloat(tg?.version || '0');
-          try { if (v >= 6.1 && typeof tg.setHeaderColor === 'function') tg.setHeaderColor('bg_color'); } catch { }
-          try { if (v >= 6.1 && typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor('#ffffff'); } catch { }
-          tg?.ready?.();
+        const token = apiClient.getToken();
+        if (!token) {
+          setLoading(false);
+          return;
         }
 
-        if (hasTGUser) {
-          await handleTelegramAuth(tg.initDataUnsafe.user);
-        } else {
-          await checkExistingAuth();
-        }
+        await checkExistingAuth();
       } catch (e) {
         console.error('Auth boot error:', e);
       } finally {
@@ -98,10 +86,9 @@ const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
 
     boot();
 
-    // Failsafe so UI never stays stuck
     const timeout = setTimeout(() => {
       if (!cancelled) setLoading(false);
-    }, 5000);
+    }, 2000);
 
     return () => {
       cancelled = true;
@@ -112,56 +99,36 @@ const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const checkExistingAuth = async () => {
     try {
       const token = apiClient.getToken();
-      if (token) {
-        const userData = await apiClient.getProfile();
-        if (userData.success) {
-          setUser(userData.data);
-          setIsAuthenticated(true);
-        } else {
-          throw new Error('Invalid token');
-        }
+      if (!token) return;
+
+      const userData = await apiClient.getProfile();
+      if (userData.success) {
+        setUser(userData.data.user);
+        setIsAuthenticated(true);
+      } else {
+        throw new Error('Invalid token');
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      await logout();
-    }
-  };
-
-  const handleTelegramAuth = async (telegramUser: any) => {
-    try {
-      const authData = {
-        telegramId: String(telegramUser.id),
-        username: telegramUser.username || undefined,
-        firstName: telegramUser.first_name || undefined,
-        lastName: telegramUser.last_name || undefined,
-        language: telegramUser.language_code === 'en' ? 'en' : 'uz',
-      };
-
-      const response = await apiClient.login(authData);
-      if (response.success && response.data?.token) {
-        apiClient.setToken(response.data.token);
-        setUser(response.data.user);
-        setIsAuthenticated(true);
-        localStorage.setItem('qopchiq_user', JSON.stringify(response.data.user));
-      } else {
-        throw new Error(response.message || 'Login failed');
+      apiClient.setToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('qopchiq_user');
       }
-    } catch (error) {
-      console.error('Telegram authentication failed:', error);
     }
   };
 
   const checkAuth = async () => {
     try {
       const token = apiClient.getToken();
-      if (token) {
-        const userData = await apiClient.getProfile();
-        if (userData.success) {
-          setUser(userData.data);
-          setIsAuthenticated(true);
-        } else {
-          throw new Error('Invalid token');
-        }
+      if (!token) return;
+
+      const userData = await apiClient.getProfile();
+      if (userData.success) {
+        setUser(userData.data.user);
+        setIsAuthenticated(true);
+      } else {
+        throw new Error('Invalid token');
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -171,38 +138,117 @@ const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     }
   };
 
-  const login = async (telegramData: any) => {
+  const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const response = await apiClient.login(telegramData);
+
+      // Demo login (optional)
+      if (email === 'demo@qopchiq.uz' && password === 'demo123') {
+        const demoUser: User = {
+          _id: '507f1f77bcf86cd799439011', // Valid MongoDB ObjectId format
+          email: 'demo@qopchiq.uz',
+          username: 'demo_user',
+          firstName: 'Demo',
+          lastName: 'User',
+          language: 'uz',
+          monthlyLimit: 1_000_000,
+          currentBalance: 500_000,
+          level: 5,
+          coins: 150,
+          streak: 7,
+          badges: ['first_expense', 'savings_master'],
+          lastActive: new Date(),
+          isActive: true,
+          joinedAt: new Date(),
+        };
+
+        setUser(demoUser);
+        setIsAuthenticated(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('qopchiq_user', JSON.stringify(demoUser));
+          localStorage.setItem('auth_token', 'demo-token');
+        }
+
+        return { success: true, data: { user: demoUser, token: 'demo-token' } };
+      }
+
+      const response = await apiClient.login({ email, password });
       if (response.success && response.data?.token) {
         apiClient.setToken(response.data.token);
         setUser(response.data.user);
         setIsAuthenticated(true);
-        localStorage.setItem('qopchiq_user', JSON.stringify(response.data.user));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('qopchiq_user', JSON.stringify(response.data.user));
+        }
         return response;
       }
       throw new Error(response.message || 'Login failed');
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (
+    email: string,
+    password: string,
+    username?: string,
+    firstName?: string,
+    lastName?: string
+  ) => {
+    try {
+      setLoading(true);
+      const response = await apiClient.register({
+        email,
+        password,
+        username,
+        firstName,
+        lastName,
+        language: 'uz',
+      });
+      if (response.success && response.data?.token) {
+        apiClient.setToken(response.data.token);
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('qopchiq_user', JSON.stringify(response.data.user));
+        }
+        return response;
+      }
+      throw new Error(response.message || 'Registration failed');
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
-    try { if (isAuthenticated) await apiClient.logout(); } catch { }
+    try {
+      if (isAuthenticated) await apiClient.logout();
+    } catch {
+      // ignore
+    }
     apiClient.setToken(null);
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('qopchiq_user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('qopchiq_user');
+    }
     setUser(null);
     setIsAuthenticated(false);
   };
 
   const updateUser = async (userData: any) => {
-    if (!user?.telegramId) throw new Error('User not found');
-    const updatedUser = await apiClient.updateUser(user.telegramId, userData);
+    if (!user?._id) throw new Error('User not found');
+    const updatedUser = await apiClient.updateUser(user._id, userData);
     if (updatedUser.success) {
       setUser(updatedUser.data);
-      localStorage.setItem('qopchiq_user', JSON.stringify(updatedUser.data));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('qopchiq_user', JSON.stringify(updatedUser.data));
+      }
       return updatedUser;
     }
     throw new Error(updatedUser.message || 'Update failed');
@@ -210,11 +256,8 @@ const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
 
   const refreshToken = async () => {
     try {
-      const response = await apiClient.refreshToken();
-      if (response.success && response.data?.token) {
-        apiClient.setToken(response.data.token);
-        return response.data.token;
-      }
+      const newToken = await apiClient.refreshToken();
+      if (newToken) return newToken;
     } catch (error) {
       console.error('Token refresh failed:', error);
       await logout();
@@ -226,17 +269,15 @@ const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     user,
     loading,
     isAuthenticated,
-    telegramWebApp,
-    isTelegramAvailable,
     login,
+    register,
     logout,
     updateUser,
     checkAuth,
     refreshToken,
-    handleTelegramAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export default AuthProvider;
+export { AuthProvider };

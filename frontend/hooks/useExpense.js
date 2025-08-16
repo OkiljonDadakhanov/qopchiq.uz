@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { apiClient } from "@/lib/api";
-import { useAuth } from "./useAuth";
+import { useAuth } from "./useAuth.tsx";
 
 export function useExpenses() {
   const { user } = useAuth();

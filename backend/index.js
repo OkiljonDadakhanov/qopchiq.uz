@@ -37,13 +37,33 @@ app.use("/api/", limiter);
 // CORS configuration
 app.use(
   cors({
-    origin:
-      process.env.NODE_ENV === "production"
-        ? process.env.FRONTEND_URL
-        : ["http://localhost:3000", "http://localhost:3001"],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins =
+        process.env.NODE_ENV === "production"
+          ? [process.env.FRONTEND_URL]
+          : [
+              "http://localhost:3000",
+              "http://localhost:3001",
+              "http://localhost:3002",
+              "http://localhost:3003",
+              "http://127.0.0.1:3000",
+              "http://127.0.0.1:3001",
+              "http://127.0.0.1:3002",
+              "http://127.0.0.1:3003",
+            ];
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
 
@@ -62,6 +82,8 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || "development",
+    database:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   });
 });
 
@@ -94,10 +116,14 @@ const gracefulShutdown = () => {
   console.log("Received shutdown signal, closing HTTP server...");
   server.close(() => {
     console.log("HTTP server closed");
-    mongoose.connection.close(false, () => {
-      console.log("MongoDB connection closed");
+    if (mongoose.connection.readyState === 1) {
+      mongoose.connection.close(false, () => {
+        console.log("MongoDB connection closed");
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
+    }
   });
 };
 
@@ -109,14 +135,27 @@ const PORT = process.env.PORT || 5000;
 let server;
 
 const startServer = async () => {
-  await connectDB();
-  server = app.listen(PORT, () => {
-    console.log(
-      `Server running in ${
-        process.env.NODE_ENV || "development"
-      } mode on port ${PORT}`
-    );
-  });
+  try {
+    // Try to connect to database, but don't fail if it's not available
+    await connectDB();
+
+    server = app.listen(PORT, () => {
+      console.log(
+        `Server running in ${
+          process.env.NODE_ENV || "development"
+        } mode on port ${PORT}`
+      );
+      console.log(`Health check: http://localhost:${PORT}/health`);
+      console.log(
+        `Database status: ${
+          mongoose.connection.readyState === 1 ? "Connected" : "Not connected"
+        }`
+      );
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
 };
 
 startServer();
