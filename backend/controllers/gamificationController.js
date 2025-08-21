@@ -86,9 +86,7 @@ const getLeaderboard = asyncHandler(async (req, res) => {
   }
 
   const leaderboard = await User.find(matchQuery)
-    .select(
-      "telegramId username firstName lastName level coins streak lastActive"
-    )
+    .select("email username firstName lastName level coins streak lastActive")
     .sort({ [sortField]: -1, lastActive: -1 })
     .limit(Number.parseInt(limit));
 

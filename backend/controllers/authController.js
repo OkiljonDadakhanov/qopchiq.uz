@@ -105,89 +105,6 @@ const loginWithEmail = asyncHandler(async (req, res) => {
   );
 });
 
-// @desc    Authenticate user with Telegram data and get JWT token
-// @route   POST /api/auth/telegram
-// @access  Public
-const authenticateWithTelegram = asyncHandler(async (req, res) => {
-  // Check if database is connected
-  if (!isDatabaseConnected()) {
-    return sendError(
-      res,
-      503,
-      "Database is not available. Please try again later."
-    );
-  }
-
-  const { telegramId, username, firstName, lastName, language, photoUrl } =
-    req.body;
-
-  try {
-    // Find existing user or create new one
-    let user = await User.findOne({ telegramId });
-
-    if (user) {
-      // Update existing user with latest Telegram data
-      user.username = username || user.username;
-      user.firstName = firstName || user.firstName;
-      user.lastName = lastName || user.lastName;
-      user.language = language || user.language;
-      user.lastActive = new Date();
-
-      await user.save();
-    } else {
-      // Create new user
-      user = await User.create({
-        telegramId,
-        username,
-        firstName,
-        lastName,
-        language: language || "uz",
-        lastActive: new Date(),
-      });
-    }
-
-    // Generate JWT token
-    const token = generateToken(user._id);
-
-    // Set cookie (optional)
-    const cookieOptions = {
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-    };
-
-    res.cookie("token", token, cookieOptions);
-
-    sendResponse(
-      res,
-      200,
-      {
-        token,
-        user: {
-          id: user._id,
-          telegramId: user.telegramId,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: user.fullName,
-          language: user.language,
-          level: user.level,
-          coins: user.coins,
-          streak: user.streak,
-          badges: user.badges,
-          preferences: user.preferences,
-          lastActive: user.lastActive,
-        },
-      },
-      "Authentication successful"
-    );
-  } catch (error) {
-    console.error("Telegram auth error:", error);
-    sendError(res, 500, "Authentication failed");
-  }
-});
-
 // @desc    Refresh JWT token
 // @route   POST /api/auth/refresh
 // @access  Public (requires valid token)
@@ -261,7 +178,7 @@ const refreshToken = asyncHandler(async (req, res) => {
         token: newToken,
         user: {
           id: user._id,
-          telegramId: user.telegramId,
+          email: user.email,
           username: user.username,
           fullName: user.fullName,
           level: user.level,
@@ -312,7 +229,7 @@ const getProfile = asyncHandler(async (req, res) => {
     {
       user: {
         id: user._id,
-        telegramId: user.telegramId,
+        email: user.email,
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -351,7 +268,6 @@ const updateProfile = asyncHandler(async (req, res) => {
   const updateData = req.body;
 
   // Remove fields that shouldn't be updated
-  delete updateData.telegramId;
   delete updateData.coins;
   delete updateData.level;
   delete updateData.streak;
@@ -374,7 +290,7 @@ const updateProfile = asyncHandler(async (req, res) => {
     {
       user: {
         id: user._id,
-        telegramId: user.telegramId,
+        email: user.email,
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -395,7 +311,6 @@ const updateProfile = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  authenticateWithTelegram,
   refreshToken,
   logout,
   getProfile,

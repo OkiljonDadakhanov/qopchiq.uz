@@ -82,7 +82,7 @@ const getOverview = asyncHandler(async (req, res) => {
     period,
     dateRange,
     user: {
-      id: user.telegramId,
+      id: user._id,
       name: user.fullName,
       level: user.level,
       coins: user.coins,

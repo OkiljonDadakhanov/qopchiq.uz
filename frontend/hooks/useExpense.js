@@ -16,7 +16,7 @@ export function useExpenses() {
     try {
       setLoading(true);
       const response = await apiClient.getExpenses({
-        userId: user.telegramId,
+        userId: user._id,
         ...params,
       });
       setExpenses(response.expenses || []);
@@ -30,7 +30,7 @@ export function useExpenses() {
   const createExpense = async (expenseData) => {
     try {
       const response = await apiClient.createExpense({
-        userId: user.telegramId,
+        userId: user._id,
         ...expenseData,
       });
       await fetchExpenses(); // Refresh list

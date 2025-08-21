@@ -90,7 +90,7 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 });
 
 // Check if user owns resource (for user-specific routes)
-const authorize = (resourceField = "telegramId") => {
+const authorize = (resourceField = "userId") => {
   return asyncHandler(async (req, res, next) => {
     if (!req.user) {
       return sendError(res, 401, "Authentication required");
@@ -99,7 +99,7 @@ const authorize = (resourceField = "telegramId") => {
     // Check if user is accessing their own resource
     const resourceId = req.params[resourceField] || req.body[resourceField];
 
-    if (resourceId && req.user.telegramId !== resourceId) {
+    if (resourceId && req.user._id.toString() !== resourceId) {
       return sendError(
         res,
         403,

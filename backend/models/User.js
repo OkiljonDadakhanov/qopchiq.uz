@@ -2,13 +2,6 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
-    telegramId: {
-      type: String,
-      unique: true,
-      sparse: true,
-      index: true,
-      trim: true,
-    },
     email: {
       type: String,
       unique: true,
@@ -145,11 +138,6 @@ userSchema.pre("save", function (next) {
   }
   next();
 });
-
-// Static method to find user by telegram ID
-userSchema.statics.findByTelegramId = function (telegramId) {
-  return this.findOne({ telegramId, isActive: true });
-};
 
 // Instance method to add coins
 userSchema.methods.addCoins = function (amount) {

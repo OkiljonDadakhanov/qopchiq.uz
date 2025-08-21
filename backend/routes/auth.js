@@ -3,7 +3,6 @@ const router = express.Router();
 const { body } = require("express-validator");
 const { handleValidationErrors } = require("../utils/validation");
 const {
-  authenticateWithTelegram,
   refreshToken,
   logout,
   getProfile,
@@ -11,6 +10,8 @@ const {
   registerWithEmail,
   loginWithEmail,
 } = require("../controllers/authController");
+const { authenticate, optionalAuth } = require("../middleware/auth");
+
 // Email/password auth
 router.post(
   "/register",
@@ -31,23 +32,6 @@ router.post(
   ],
   loginWithEmail
 );
-const { authenticate, optionalAuth } = require("../middleware/auth");
-
-// Validation rules
-const telegramAuthValidation = [
-  body("telegramId")
-    .isString()
-    .notEmpty()
-    .withMessage("Telegram ID is required"),
-  body("username").optional().isString().isLength({ max: 50 }),
-  body("firstName").optional().isString().isLength({ max: 50 }),
-  body("lastName").optional().isString().isLength({ max: 50 }),
-  body("language")
-    .optional()
-    .isIn(["uz", "en"])
-    .withMessage("Language must be uz or en"),
-  handleValidationErrors,
-];
 
 const updateProfileValidation = [
   body("username").optional().isString().isLength({ max: 50 }),
@@ -63,7 +47,6 @@ const updateProfileValidation = [
 ];
 
 // Routes
-router.post("/telegram", telegramAuthValidation, authenticateWithTelegram);
 router.post("/refresh", refreshToken);
 router.post("/logout", authenticate, logout);
 router.get("/profile", authenticate, getProfile);
@@ -78,7 +61,7 @@ router.get("/check", optionalAuth, (req, res) => {
     user: req.user
       ? {
           id: req.user._id,
-          telegramId: req.user.telegramId,
+          email: req.user.email,
           username: req.user.username,
           level: req.user.level,
         }

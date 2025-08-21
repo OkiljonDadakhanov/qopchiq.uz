@@ -4,7 +4,7 @@ import { apiClient } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
-  const [telegramId, setTelegramId] = useState("");
+  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,9 +16,9 @@ export default function RegisterPage() {
     setError("");
     setSuccess("");
     try {
-      await apiClient.request("/users", {
+      await apiClient.request("/auth/register", {
         method: "POST",
-        body: { telegramId, name, password },
+        body: { email, name, password },
       });
       setSuccess("Registration successful! You can now log in.");
       setTimeout(() => router.push("/auth"), 1500);
@@ -36,10 +36,10 @@ export default function RegisterPage() {
       >
         <h2 className="text-2xl font-bold mb-4">Register</h2>
         <input
-          type="text"
-          placeholder="Telegram ID"
-          value={telegramId}
-          onChange={(e) => setTelegramId(e.target.value)}
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           className="w-full mb-4 p-2 border rounded"
           required
         />
@@ -53,10 +53,11 @@ export default function RegisterPage() {
         />
         <input
           type="password"
-          placeholder="Password (optional)"
+          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full mb-4 p-2 border rounded"
+          required
         />
         {error && <div className="text-red-500 mb-2">{error}</div>}
         {success && <div className="text-green-600 mb-2">{success}</div>}
