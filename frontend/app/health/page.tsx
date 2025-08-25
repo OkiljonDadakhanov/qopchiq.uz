@@ -1,13 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Navigation } from "@/components/navigation";
-import { HealthStats } from "@/components/health-stats";
-import { HealthChallenges } from "@/components/health-challenges";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Utensils, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { apiClient } from "@/lib/api";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Loader2,
+  Plus,
+  HeartPulse,
+  Activity,
+  Target,
+} from "lucide-react";
+
+import { HealthStats } from "@/components/health-stats";
+import { AddMealModal } from "@/components/add-meal-modal";
+import { Navigation } from "@/components/navigation";
+
+// Types
 interface Meal {
   id: string;
   name: string;
@@ -17,164 +29,306 @@ interface Meal {
   category: "protein" | "carbs" | "veggies" | "sweets";
 }
 
-interface UserData {
-  monthlyLimit: number;
-  currentBalance: number;
-  level: number;
-  coins: number;
-  streak: number;
-  badges: string[];
-}
-
-interface Recipe {
-  title: string;
-  link: string;
-}
-
 export default function HealthPage() {
-  const [language, setLanguage] = useState<"uz" | "ru" | "en">("uz");
+  const { user, isAuthenticated, loading } = useAuth();
+
+  // State for data
   const [meals, setMeals] = useState<Meal[]>([]);
-  const [userData, setUserData] = useState<UserData>({
-    monthlyLimit: 1000000,
-    currentBalance: 500000,
-    level: 1,
-    coins: 0,
-    streak: 0,
-    badges: [],
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Modal states
+  const [showMealModal, setShowMealModal] = useState(false);
+
+  // Fetch health data
+  const fetchHealthData = async () => {
+    if (!user?._id) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsRefreshing(true);
+      setError(null);
+
+      // Fetch meals
+      try {
+        const mealsResponse = await apiClient.getRecentMeals(user._id, 50);
+        if (mealsResponse.success && mealsResponse.data?.meals) {
+          setMeals(mealsResponse.data.meals);
+        }
+      } catch (error) {
+        console.error("Failed to fetch meals:", error);
+      }
+
+    } catch (error) {
+      console.error("Error in fetchHealthData:", error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Load data on mount and when user changes
   useEffect(() => {
-    const savedLanguage = localStorage.getItem("qopchiq-language");
-    const savedMeals = localStorage.getItem("qopchiq-meals");
-    const savedUserData = localStorage.getItem("qopchiq-userdata");
+    if (isAuthenticated && user) {
+      fetchHealthData();
+    } else if (isAuthenticated && !loading) {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, user, loading]);
 
-    if (savedLanguage) setLanguage(savedLanguage as "uz" | "ru" | "en");
-    if (savedMeals) setMeals(JSON.parse(savedMeals));
-    if (savedUserData) setUserData(JSON.parse(savedUserData));
-  }, []);
+  // Handle meal creation
+  const handleMealAdded = async (newMeal: any) => {
+    if (!user?._id) return;
 
-  const texts = {
-    uz: {
-      title: "Sog'liq va turmush tarzi",
-      cookingTutorials: "Oson va sog'lom taom tayyorlash",
-      tutorialDesc: "Sog'lom ovqatlanish uchun retseptlar va maslahatlar",
-      viewTutorials: "Retseptlar",
-    },
-    ru: {
-      title: "Здоровье и образ жизни",
-      cookingTutorials: "Простые и здоровые кулинарные уроки",
-      tutorialDesc: "Рецепты и советы для здорового питания",
-      viewTutorials: "Рецепты",
-    },
-    en: {
-      title: "Health & Lifestyle",
-      cookingTutorials: "Easy and Healthy Cooking Tutorials",
-      tutorialDesc: "Recipes and tips for healthy eating",
-      viewTutorials: "Recipes",
-    },
+    try {
+      const response = await apiClient.createMeal({
+        ...newMeal,
+        userId: user._id,
+        date: new Date().toISOString()
+      });
+
+      if (response.success) {
+        await fetchHealthData();
+      } else {
+        console.error("Failed to create meal:", response.message);
+        setError("Failed to create meal. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error creating meal:", error);
+      setError("Failed to create meal. Please try again.");
+    }
   };
 
-  const recipes: Record<"uz" | "ru" | "en", Recipe[]> = {
-    uz: [
-      {
-        title: "Bodring salati",
-        link: "https://youtu.be/dQw4w9WgXcQ?list=RDdQw4w9WgXcQ",
-      },
-      {
-        title: "Pishloqli nonushta",
-        link: "https://youtu.be/dQw4w9WgXcQ?list=RDdQw4w9WgXcQ",
-      },
-    ],
-    ru: [
-      { title: "Салат из огурцов", link: "https://example.com/ru/salat" },
-      { title: "Завтрак с творогом", link: "https://example.com/ru/zavtrak" },
-    ],
-    en: [
-      {
-        title: "Cucumber Salad",
-        link: "https://example.com/en/cucumber-salad",
-      },
-      {
-        title: "Protein Breakfast Bowl",
-        link: "https://example.com/en/breakfast",
-      },
-    ],
-  };
-
-  const t = texts[language];
-  const tutorialList = recipes[language];
-
-  const todayMeals = meals.filter(
-    (meal) => new Date(meal.date).toDateString() === new Date().toDateString()
-  );
-
-  const handleCoinsEarned = (coins: number) => {
-    const updated = {
-      ...userData,
-      coins: userData.coins + coins,
-      level: Math.floor((userData.coins + coins) / 100) + 1,
-    };
-    setUserData(updated);
-    localStorage.setItem("qopchiq-userdata", JSON.stringify(updated));
-  };
-
-  const handleTutorialClick = (recipe: Recipe) => {
-    handleCoinsEarned(2); // +2 coins for viewing
-    window.open(recipe.link, "_blank");
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 pb-20">
-      <div className="max-w-md mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center pt-4">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-            <span>❤️‍🩹</span>
-            {t.title}
-          </h1>
+  // Loading state
+  if (loading || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading health data...</p>
         </div>
+      </div>
+    );
+  }
 
-        {/* Health Stats */}
-        <HealthStats meals={todayMeals} language={language} />
-
-        {/* Health Challenges */}
-        <HealthChallenges
-          language={language}
-          onCoinsEarned={handleCoinsEarned}
-          streak={userData.streak}
-        />
-
-        {/* Dynamic Cooking Tutorials */}
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Utensils className="h-5 w-5" />
-              {t.cookingTutorials}
-            </CardTitle>
+  // Not authenticated
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Not Authenticated</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-gray-600">{t.tutorialDesc}</p>
-
-            {tutorialList.map((recipe) => (
-              <Button
-                key={recipe.link}
-                variant="outline"
-                className="w-full flex justify-between items-center"
-                onClick={() => handleTutorialClick(recipe)}
-              >
-                <span>{recipe.title}</span>
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            ))}
-
-            <div className="text-xs text-gray-500 text-center italic">
-              (+2 Qopchiq Coins for each recipe view)
-            </div>
+          <CardContent>
+            <p>You need to be logged in to access health data.</p>
+            <Button
+              onClick={() => window.location.href = "/"}
+              className="w-full mt-4"
+            >
+              Go to Login
+            </Button>
           </CardContent>
         </Card>
       </div>
+    );
+  }
 
+  const language = user.language || "uz";
+
+  // Calculate today's meals
+  const today = new Date().toDateString();
+  const todaysMeals = meals.filter(meal =>
+    new Date(meal.date).toDateString() === today
+  );
+
+  // Calculate total calories for today
+  const totalCalories = todaysMeals.reduce((sum, meal) => sum + meal.calories, 0);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex">
+      {/* Sidebar Navigation */}
       <Navigation language={language} />
+
+      {/* Main Content */}
+      <div className="flex-1 lg:ml-64">
+        {/* Header */}
+        <div className="bg-white/80 backdrop-blur-sm shadow-sm border-b sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Health & Nutrition</h1>
+                <p className="text-sm text-gray-500">Track your meals and health metrics</p>
+              </div>
+              <Button
+                onClick={() => setShowMealModal(true)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Meal
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HeartPulse className="h-5 w-5 text-red-500" />
+                  Today's Calories
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-red-600">
+                  {totalCalories} cal
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Target: 2000 cal
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-blue-500" />
+                  Meals Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-blue-600">
+                  {todaysMeals.length}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Meals logged
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-green-500" />
+                  Weekly Average
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-green-600">
+                  {Math.round(meals.length / 7)} cal
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Per day this week
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Health Stats */}
+            <HealthStats meals={meals} language={language} />
+
+            {/* Today's Meals */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Today's Meals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {todaysMeals.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    <div className="text-4xl mb-2">🍽️</div>
+                    <p className="text-lg font-medium text-gray-900 mb-2">No meals logged today</p>
+                    <p className="text-gray-600 mb-4">Start tracking your nutrition to see your meals here</p>
+                    <Button
+                      onClick={() => setShowMealModal(true)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Meal
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {todaysMeals.map((meal) => (
+                      <div key={meal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{meal.emoji}</span>
+                          <div>
+                            <div className="font-medium">{meal.name}</div>
+                            <div className="text-sm text-gray-500">{meal.category}</div>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">
+                          {meal.calories} cal
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Meals */}
+          <div className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Meals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {meals.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    <div className="text-4xl mb-2">🍽️</div>
+                    <p className="text-lg font-medium text-gray-900 mb-2">No meals logged yet</p>
+                    <p className="text-gray-600 mb-4">Start tracking your nutrition to see your meal history</p>
+                    <Button
+                      onClick={() => setShowMealModal(true)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Meal
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {meals.slice(0, 10).map((meal) => (
+                      <div key={meal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{meal.emoji}</span>
+                          <div>
+                            <div className="font-medium">{meal.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {meal.category} • {new Date(meal.date).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">
+                          {meal.calories} cal
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showMealModal && (
+        <AddMealModal
+          isOpen={showMealModal}
+          onClose={() => setShowMealModal(false)}
+          onAdd={handleMealAdded}
+          language={language}
+        />
+      )}
     </div>
   );
 }

@@ -1,13 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Navigation } from "@/components/navigation";
-import { AddExpenseModal } from "@/components/add-expense-modal";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { apiClient } from "@/lib/api";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import {
+  Loader2,
+  Plus,
+  TrendingDown,
+  Target,
+  TrendingUp,
+} from "lucide-react";
+
+import { ExpenseList } from "@/components/expense-list";
+import { AddExpenseModal } from "@/components/add-expense-modal";
+import { Navigation } from "@/components/navigation";
+
+// Types
 interface Expense {
   id: string;
   amount: number;
@@ -16,305 +28,231 @@ interface Expense {
   description: string;
   date: string;
   mood?: string;
+  location?: string;
+}
+
+interface Analytics {
+  totalExpenses: number;
+  totalIncome: number;
+  savings: number;
+  monthlySpending: number;
+  spendingByCategory: Record<string, number>;
 }
 
 export default function ExpensesPage() {
+  const { user, isAuthenticated, loading } = useAuth();
+
+  // State for data
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [language, setLanguage] = useState<"uz" | "en">("uz");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState<
-    "today" | "week" | "month" | "all"
-  >("all");
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const savedExpenses = localStorage.getItem("qopchiq-expenses");
-    const savedLanguage = localStorage.getItem("qopchiq-language");
+  // Modal states
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
 
-    if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
-    if (savedLanguage === "en") setLanguage("en");
-    else setLanguage("uz");
-  }, []);
-
-  const texts = {
-    uz: {
-      title: "Xarajatlar",
-      addExpense: "Xarajat qo'shish",
-      search: "Qidirish",
-      filter: "Filtr",
-      all: "Hammasi",
-      today: "Bugun",
-      week: "Bu hafta",
-      month: "Bu oy",
-      total: "Jami",
-      average: "O'rtacha",
-      highest: "Eng yuqori",
-      categories: "Kategoriyalar",
-      noExpenses: "Xarajatlar topilmadi",
-    },
-    en: {
-      title: "Expenses",
-      addExpense: "Add Expense",
-      search: "Search",
-      filter: "Filter",
-      all: "All",
-      today: "Today",
-      week: "This Week",
-      month: "This Month",
-      total: "Total",
-      average: "Average",
-      highest: "Highest",
-      categories: "Categories",
-      noExpenses: "No expenses found",
-    },
-  };
-
-  const t = texts[language];
-
-  const addExpense = (expense: Omit<Expense, "id">) => {
-    const newExpense = { ...expense, id: Date.now().toString() };
-    const updatedExpenses = [newExpense, ...expenses];
-    setExpenses(updatedExpenses);
-    localStorage.setItem("qopchiq-expenses", JSON.stringify(updatedExpenses));
-  };
-
-  // Filter expenses based on search, category, and date
-  const filteredExpenses = expenses.filter((expense) => {
-    const matchesSearch =
-      expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.category.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesCategory =
-      filterCategory === "all" || expense.category === filterCategory;
-
-    const expenseDate = new Date(expense.date);
-    const now = new Date();
-    let matchesDate = true;
-
-    if (dateFilter === "today") {
-      matchesDate = expenseDate.toDateString() === now.toDateString();
-    } else if (dateFilter === "week") {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      matchesDate = expenseDate >= weekAgo;
-    } else if (dateFilter === "month") {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      matchesDate = expenseDate >= monthStart;
+  // Fetch expenses data
+  const fetchExpensesData = async () => {
+    if (!user?._id) {
+      setIsLoading(false);
+      return;
     }
 
-    return matchesSearch && matchesCategory && matchesDate;
-  });
+    try {
+      setIsRefreshing(true);
+      setError(null);
 
-  // Calculate statistics
-  const totalAmount = filteredExpenses.reduce(
-    (sum, expense) => sum + expense.amount,
-    0
-  );
-  const averageAmount =
-    filteredExpenses.length > 0 ? totalAmount / filteredExpenses.length : 0;
-  const highestExpense = filteredExpenses.reduce(
-    (max, expense) => (expense.amount > max.amount ? expense : max),
-    filteredExpenses[0] || { amount: 0 }
-  );
+      // Fetch expenses
+      try {
+        const expensesResponse = await apiClient.getRecentExpenses(user._id, 50);
+        if (expensesResponse.success && expensesResponse.data?.expenses) {
+          setExpenses(expensesResponse.data.expenses);
+        }
+      } catch (error) {
+        console.error("Failed to fetch expenses:", error);
+      }
 
-  // Category breakdown
-  const categoryTotals = filteredExpenses.reduce((acc, expense) => {
-    acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-    return acc;
-  }, {} as Record<string, number>);
+      // Fetch analytics
+      try {
+        const analyticsResponse = await apiClient.getOverviewAnalytics(user._id, "month");
+        if (analyticsResponse.success && analyticsResponse.data) {
+          setAnalytics(analyticsResponse.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch analytics:", error);
+      }
 
-  const categories = Object.keys(categoryTotals)
-    .map((category) => ({
-      category,
-      total: categoryTotals[category],
-      percentage:
-        totalAmount > 0 ? (categoryTotals[category] / totalAmount) * 100 : 0,
-    }))
-    .sort((a, b) => b.total - a.total);
+    } catch (error) {
+      console.error("Error in fetchExpensesData:", error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Load data on mount and when user changes
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchExpensesData();
+    } else if (isAuthenticated && !loading) {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, user, loading]);
+
+  // Handle expense creation
+  const handleExpenseAdded = async (newExpense: any) => {
+    if (!user?._id) return;
+
+    try {
+      const response = await apiClient.createExpense({
+        ...newExpense,
+        userId: user._id,
+        date: new Date().toISOString()
+      });
+
+      if (response.success) {
+        await fetchExpensesData();
+      } else {
+        console.error("Failed to create expense:", response.message);
+        setError("Failed to create expense. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error creating expense:", error);
+      setError("Failed to create expense. Please try again.");
+    }
+  };
+
+  // Loading state
+  if (loading || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading expenses...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Not Authenticated</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>You need to be logged in to access expenses.</p>
+            <Button
+              onClick={() => window.location.href = "/"}
+              className="w-full mt-4"
+            >
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const language = user.language || "uz";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 pb-20">
-      <div className="max-w-md mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex">
+      {/* Sidebar Navigation */}
+      <Navigation language={language} />
+
+      {/* Main Content */}
+      <div className="flex-1 lg:ml-64">
         {/* Header */}
-        <div className="text-center pt-4">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-            <span>💸</span>
-            {t.title}
-          </h1>
-        </div>
-
-        {/* Add Expense Button */}
-        <Button
-          onClick={() => setShowAddModal(true)}
-          className="w-full h-12 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-lg"
-        >
-          + {t.addExpense}
-        </Button>
-
-        {/* Search and Filters */}
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-          <CardContent className="p-4 space-y-3">
-            <Input
-              placeholder={t.search}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-
-            <div className="flex gap-2 flex-wrap">
-              {["all", "today", "week", "month"].map((filter) => (
-                <Button
-                  key={filter}
-                  variant={dateFilter === filter ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDateFilter(filter as any)}
-                >
-                  {t[filter as keyof typeof t]}
-                </Button>
-              ))}
+        <div className="bg-white/80 backdrop-blur-sm shadow-sm border-b sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Expense Management</h1>
+                <p className="text-sm text-gray-500">Track and manage your expenses</p>
+              </div>
+              <Button
+                onClick={() => setShowExpenseModal(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Expense
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Statistics */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4 text-center">
-              <div className="text-lg mb-1">💰</div>
-              <div className="text-xs text-gray-600">{t.total}</div>
-              <div className="text-sm font-bold text-red-600">
-                {totalAmount.toLocaleString()} so'm
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4 text-center">
-              <div className="text-lg mb-1">📊</div>
-              <div className="text-xs text-gray-600">{t.average}</div>
-              <div className="text-sm font-bold text-blue-600">
-                {averageAmount.toLocaleString()} so'm
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4 text-center">
-              <div className="text-lg mb-1">⬆️</div>
-              <div className="text-xs text-gray-600">{t.highest}</div>
-              <div className="text-sm font-bold text-orange-600">
-                {highestExpense.amount.toLocaleString()} so'm
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         </div>
 
-        {/* Category Breakdown */}
-        {categories.length > 0 && (
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">{t.categories}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {categories.map((cat) => (
-                <div
-                  key={cat.category}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">
-                      {cat.category === "food" && "🍕"}
-                      {cat.category === "transport" && "🚗"}
-                      {cat.category === "home" && "🏠"}
-                      {cat.category === "clothes" && "👕"}
-                      {cat.category === "entertainment" && "🎮"}
-                      {cat.category === "health" && "💊"}
-                      {cat.category === "education" && "📚"}
-                      {cat.category === "other" && "💰"}
-                    </span>
-                    <span className="font-medium capitalize">
-                      {cat.category}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold">
-                      {cat.total.toLocaleString()} so'm
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {cat.percentage.toFixed(1)}%
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-red-500" />
+                  Total Spent This Month
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-red-600">
+                  {analytics?.monthlySpending?.toLocaleString() || "0"} UZS
+                </p>
+              </CardContent>
+            </Card>
 
-        {/* Expenses List */}
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center justify-between">
-              <span>Xarajatlar ro'yxati</span>
-              <Badge variant="secondary">{filteredExpenses.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {filteredExpenses.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <div className="text-4xl mb-2">📝</div>
-                <p>{t.noExpenses}</p>
-              </div>
-            ) : (
-              filteredExpenses.map((expense) => (
-                <div
-                  key={expense.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{expense.emoji}</span>
-                    <div>
-                      <div className="font-medium">
-                        {expense.description || expense.category}
-                      </div>
-                      <div className="text-sm text-gray-500 flex items-center gap-2">
-                        {expense.mood && (
-                          <span>
-                            {expense.mood === "happy" && "😊"}
-                            {expense.mood === "neutral" && "😐"}
-                            {expense.mood === "sad" && "😔"}
-                            {expense.mood === "stressed" && "😤"}
-                          </span>
-                        )}
-                        <span>
-                          {new Date(expense.date).toLocaleDateString("uz-UZ")}{" "}
-                          {new Date(expense.date).toLocaleTimeString("uz-UZ", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="font-bold">
-                    {expense.amount.toLocaleString()} so'm
-                  </Badge>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-blue-500" />
+                  Remaining Budget
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-blue-600">
+                  {((user.monthlyLimit || 0) - (analytics?.monthlySpending || 0)).toLocaleString()} UZS
+                </p>
+                <Progress
+                  value={((analytics?.monthlySpending || 0) / (user.monthlyLimit || 1)) * 100}
+                  className="mt-2"
+                />
+              </CardContent>
+            </Card>
 
-        <AddExpenseModal
-          isOpen={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onAdd={addExpense}
-          language={language}
-          currentBalance={500000}
-          monthlySpent={0}
-          monthlyLimit={1000000}
-        />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-500" />
+                  Savings
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-green-600">
+                  {analytics?.savings?.toLocaleString() || "0"} UZS
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Expenses List */}
+          <ExpenseList expenses={expenses} language={language} />
+        </div>
       </div>
 
-      <Navigation language={language} />
+      {/* Modals */}
+      {showExpenseModal && (
+        <AddExpenseModal
+          isOpen={showExpenseModal}
+          onClose={() => setShowExpenseModal(false)}
+          onAdd={handleExpenseAdded}
+          language={language}
+          currentBalance={user.currentBalance || 0}
+          monthlySpent={analytics?.monthlySpending || 0}
+          monthlyLimit={user.monthlyLimit || 1000000}
+        />
+      )}
     </div>
   );
 }

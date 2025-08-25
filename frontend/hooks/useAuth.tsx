@@ -10,6 +10,8 @@ import React, {
 import { apiClient } from '@/lib/api'; // or '../lib/api' if you don't use @ alias
 
 export interface User {
+  createdAt: any;
+  lastLoginAt: any;
   _id: string;
   email: string;
   username?: string;
